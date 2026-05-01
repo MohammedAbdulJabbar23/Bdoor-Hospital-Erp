@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: hms-app
+  datasource:
+    url: ${HMS_DB_URL:jdbc:postgresql://localhost:5432/hms}
+    username: ${HMS_DB_USER:hms}
+    password: ${HMS_DB_PASSWORD:hms}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  # Default is 8 KB; a polluted localhost (cookies from other dev apps) trips it easily.
+  max-http-request-header-size: 64KB
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    # Leniently parse weird cookie values that other dev apps leave on localhost
+    # (e.g. JSON arrays as cookie values).
+    relaxed-query-chars: "[,]"
+    relaxed-path-chars: "[,]"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+hms:
+  patient:
+    mrn:
+      prefix: ${HMS_MRN_PREFIX:ALB}
+  security:
+    jwt:
+      # Base64-encoded HMAC secret. Override in production via env var.
+      secret: ${HMS_JWT_SECRET:ZGV2LW9ubHktc2VjcmV0LXJlcGxhY2UtaW4tcHJvZHVjdGlvbi1tdXN0LWJlLTI1Ni1iaXRz}
+      ttl: PT8H
+      issuer: hms.albudoor
+
+logging:
+  level:
+    root: INFO
+    com.albudoor.hms: DEBUG
+    org.hibernate.SQL: WARN

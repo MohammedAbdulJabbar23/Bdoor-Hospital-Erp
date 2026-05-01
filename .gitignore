@@ -1,0 +1,43 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+hs_err_pid*
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Node
+node_modules/
+dist/
+build/
+.pnpm-debug.log
+.npm
+*.log
+
+# Env
+.env
+.env.local
+.env.*.local
+application-local.yml
+application-local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+backend/**/target/
+frontend/dist/
+frontend/coverage/
+*.log
+*.docx
