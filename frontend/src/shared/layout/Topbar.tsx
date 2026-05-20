@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, LogOut, UserCircle2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, Search, LogOut, UserCircle2, FlaskConical, Scan, HeartPulse, type LucideIcon } from 'lucide-react';
 import { LangSwitcher } from '../ui/LangSwitcher';
 import { Avatar } from '../ui/Avatar';
 import { useAuthStore } from '../auth/authStore';
 import { cn } from '../ui/cn';
+import { searchVisits, Visit } from '@/features/reception/visits/api';
 
 export function Topbar() {
   const { t, i18n } = useTranslation();
@@ -15,6 +17,36 @@ export function Topbar() {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [lastSeenAt, setLastSeenAt] = useState<number>(() => {
+    const v = window.localStorage.getItem('hms.notif.lastSeenAt');
+    return v ? Number(v) : 0;
+  });
+
+  // Surface forwarded results returning to the originating visit.
+  // Polls every 20s; finds visits where `resultsSummary` was attached recently.
+  const { data: visitsPage } = useQuery({
+    queryKey: ['notif-visits'],
+    queryFn: () => searchVisits(null, null, 0, 40),
+    refetchInterval: 20_000,
+    enabled: !!user,
+  });
+
+  const returnedNotifs = useMemo(() => {
+    const all = visitsPage?.content ?? [];
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000; // last 24h
+    return all
+      .filter((v) => v.resultsSummary && (v.endedAt ? Date.parse(v.endedAt) > cutoff : false))
+      .sort((a, b) => Date.parse(b.endedAt ?? '0') - Date.parse(a.endedAt ?? '0'))
+      .slice(0, 8);
+  }, [visitsPage]);
+
+  const unread = returnedNotifs.filter((v) => Date.parse(v.endedAt ?? '0') > lastSeenAt).length;
+
+  const markSeen = () => {
+    const now = Date.now();
+    setLastSeenAt(now);
+    window.localStorage.setItem('hms.notif.lastSeenAt', String(now));
+  };
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -68,19 +100,36 @@ export function Topbar() {
       <div ref={notifRef} className="relative">
         <button
           type="button"
-          onClick={() => setNotifOpen((v) => !v)}
+          onClick={() => { setNotifOpen((v) => !v); if (!notifOpen) markSeen(); }}
           className="relative flex h-10 w-10 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100"
           aria-label="notifications"
         >
           <Bell size={18} />
-          <span className="absolute end-2.5 top-2 h-2 w-2 rounded-full bg-brand-600 ring-2 ring-white" />
+          {unread > 0 && (
+            <span className="absolute end-2 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white ring-2 ring-white">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
         </button>
         {notifOpen && (
-          <div className="absolute end-0 mt-2 w-80 rounded-xl border border-ink-200 bg-white p-3 shadow-elevated">
+          <div className="absolute end-0 mt-2 w-96 rounded-xl border border-ink-200 bg-white p-3 shadow-elevated">
             <div className="mb-2 flex items-center justify-between px-1">
               <h4 className="text-sm font-semibold text-ink-900">{t('nav.notifications')}</h4>
+              <span className="text-[11px] text-ink-500">Last 24h</span>
             </div>
-            <p className="px-1 py-3 text-sm text-ink-500">{t('nav.noNotifications')}</p>
+            {returnedNotifs.length === 0 ? (
+              <p className="px-1 py-3 text-sm text-ink-500">{t('nav.noNotifications')}</p>
+            ) : (
+              <ul className="max-h-[60vh] divide-y divide-ink-100 overflow-y-auto">
+                {returnedNotifs.map((v) => (
+                  <NotifItem
+                    key={v.id}
+                    visit={v}
+                    onOpen={() => { setNotifOpen(false); navigate(`/clinical/exam/${v.id}`); }}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
@@ -139,5 +188,39 @@ export function Topbar() {
         )}
       </div>
     </header>
+  );
+}
+
+const ORIGIN_ICON: Record<string, LucideIcon> = {
+  LABORATORY: FlaskConical,
+  RADIOLOGY: Scan,
+  ECO: HeartPulse,
+};
+
+function NotifItem({ visit, onOpen }: { visit: Visit; onOpen: () => void }) {
+  const Icon = ORIGIN_ICON[visit.visitType] ?? FlaskConical;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-start gap-3 px-2 py-2.5 text-start hover:bg-ink-50/60"
+      >
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-700">
+          <Icon size={14} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-ink-900">
+            {visit.patientName} <span className="text-ink-500">· {visit.visitDisplayId}</span>
+          </div>
+          <div className="text-xs text-ink-500">Results received from {visit.visitType.toLowerCase()}</div>
+          {visit.resultsSummary && (
+            <div className="mt-1 line-clamp-2 rounded bg-ink-50 px-2 py-1 text-[11px] text-ink-700">
+              {visit.resultsSummary}
+            </div>
+          )}
+        </div>
+      </button>
+    </li>
   );
 }

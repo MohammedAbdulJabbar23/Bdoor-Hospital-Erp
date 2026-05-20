@@ -19,6 +19,8 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
 
     List<Visit> findAllByPatientIdOrderByStartedAtDesc(UUID patientId);
 
+    List<Visit> findAllByParentVisitIdOrderByStartedAtDesc(UUID parentVisitId);
+
     @Query("""
             SELECT v FROM Visit v
             WHERE (:type IS NULL OR v.visitType = :type)

@@ -46,7 +46,9 @@ public class CreateVisitHandler {
                 cmd.assignedDoctorId()
         );
         Visit saved = visits.save(visit);
-        saved.pullDomainEvents().forEach(events::publishEvent);
+        // See note in CreatePaymentHandler — pull events from the source reference,
+        // not from `saved`, since Spring Data merges entities with pre-assigned ids.
+        visit.pullDomainEvents().forEach(events::publishEvent);
         return saved;
     }
 }

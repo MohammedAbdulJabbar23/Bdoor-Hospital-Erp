@@ -37,4 +37,9 @@ public class ListVisitsHandler {
     public List<Visit> byPatient(UUID patientId) {
         return visits.findAllByPatientIdOrderByStartedAtDesc(patientId);
     }
+
+    @Transactional(readOnly = true)
+    public List<Visit> children(UUID parentId) {
+        return visits.findAllByParentVisitIdOrderByStartedAtDesc(parentId);
+    }
 }

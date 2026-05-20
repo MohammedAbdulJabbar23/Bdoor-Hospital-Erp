@@ -86,6 +86,15 @@ export async function forwardVisit(
   return res.data;
 }
 
+export async function forwardWithTests(
+  id: string,
+  targetType: VisitType,
+  services: { serviceItemId: string; quantity: number }[],
+): Promise<{ parent: Visit; child: Visit; caseId: string }> {
+  const res = await api.post(`/visits/${id}/forward-with-tests`, { targetType, services });
+  return res.data;
+}
+
 export async function returnVisit(
   id: string,
   resultsSummary: string,

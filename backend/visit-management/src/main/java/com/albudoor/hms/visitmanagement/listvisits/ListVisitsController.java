@@ -44,4 +44,9 @@ public class ListVisitsController {
     public List<VisitResponse> byPatient(@PathVariable UUID patientId) {
         return handler.byPatient(patientId).stream().map(VisitResponse::from).toList();
     }
+
+    @GetMapping("/{id}/children")
+    public List<VisitResponse> children(@PathVariable UUID id) {
+        return handler.children(id).stream().map(VisitResponse::from).toList();
+    }
 }

@@ -71,7 +71,8 @@ public class RegisterInfantHandler {
         );
 
         Patient saved = patients.save(infant);
-        saved.pullDomainEvents().forEach(eventPublisher::publishEvent);
+        // Pull events from the source reference; see note in CreatePaymentHandler.
+        infant.pullDomainEvents().forEach(eventPublisher::publishEvent);
         return saved;
     }
 

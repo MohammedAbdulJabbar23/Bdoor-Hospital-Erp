@@ -16,3 +16,33 @@
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
   }
 }
+
+/* Print: clean single-column layout for patient profile + prescription handouts.
+   Anything inside `.print-hide` is removed; `.print-only` is shown only on print. */
+@media print {
+  @page { margin: 12mm 12mm 16mm 12mm; }
+
+  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Remove app chrome */
+  aside, .print-hide, header[class*="sticky"], nav, [role="navigation"] { display: none !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+  .ps-\[252px\], .ps-\[68px\] { padding-inline-start: 0 !important; }
+
+  /* Cards: drop shadows / borders for cleaner printouts */
+  .shadow-card, .shadow-elevated { box-shadow: none !important; }
+  .rounded-xl, .rounded-lg { border-radius: 4px !important; }
+
+  /* Avoid breaking sections across pages */
+  section, .print-section, table { page-break-inside: avoid; }
+  h1, h2, h3 { page-break-after: avoid; }
+
+  /* Ink */
+  * { color: black !important; }
+  .text-ink-500, .text-ink-400, .text-ink-600, .text-ink-700 { color: #333 !important; }
+  .bg-brand-50, .bg-amber-50, .bg-emerald-50, .bg-sky-50, .bg-ink-50 { background: #f5f5f5 !important; }
+
+  .print-only { display: block !important; }
+}
+
+.print-only { display: none; }

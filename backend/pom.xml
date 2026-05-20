@@ -35,6 +35,11 @@
         <module>patient-registry</module>
         <module>catalogue</module>
         <module>visit-management</module>
+        <module>cashier</module>
+        <module>doctor-appointment</module>
+        <module>department-services</module>
+        <module>clinical-case</module>
+        <module>pharmacy</module>
         <module>app</module>
     </modules>
 
@@ -63,6 +68,31 @@
             <dependency>
                 <groupId>com.albudoor.hms</groupId>
                 <artifactId>visit-management</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>cashier</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>doctor-appointment</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>department-services</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>clinical-case</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>pharmacy</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

@@ -22,7 +22,7 @@ public class ToggleVipController {
     }
 
     @PutMapping("/{id}/vip")
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'CASHIER')")
     public PatientResponse toggle(@PathVariable UUID id, @Valid @RequestBody ToggleVipCommand cmd) {
         return PatientResponse.from(handler.handle(id, cmd));
     }

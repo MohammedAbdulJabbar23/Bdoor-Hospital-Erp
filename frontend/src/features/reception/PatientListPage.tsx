@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -68,6 +68,12 @@ export function PatientListPage() {
               <Download size={14} className="me-1.5" />
               {t('common.export')}
             </Button>
+            <Link to="/reception/patients/new-infant">
+              <Button variant="secondary" size="md">
+                <UserPlus size={14} className="me-1.5" />
+                {t('patient.registerInfant')}
+              </Button>
+            </Link>
             <Link to="/reception/patients/new">
               <Button variant="primary" size="md">
                 <UserPlus size={14} className="me-1.5" />
@@ -208,8 +214,12 @@ function PatientRow({
   formatDate: (iso: string) => string;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   return (
-    <tr className={cn('group transition-colors hover:bg-ink-50/60', highlighted && 'bg-brand-50/40')}>
+    <tr
+      onClick={() => navigate(`/patients/${patient.id}`)}
+      className={cn('group cursor-pointer transition-colors hover:bg-ink-50/60', highlighted && 'bg-brand-50/40')}
+    >
       <Td>
         <span className="font-mono text-xs font-semibold text-ink-900">{patient.mrn}</span>
       </Td>

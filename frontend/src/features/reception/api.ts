@@ -83,3 +83,48 @@ export async function toggleVip(id: string, vip: boolean): Promise<PatientRespon
   const res = await api.put(`/patients/${id}/vip`, { vip });
   return res.data;
 }
+
+export async function archivePatient(id: string): Promise<PatientResponse> {
+  const res = await api.put(`/patients/${id}/archive`);
+  return res.data;
+}
+
+export async function unarchivePatient(id: string): Promise<PatientResponse> {
+  const res = await api.put(`/patients/${id}/unarchive`);
+  return res.data;
+}
+
+export type DeliveryType = 'VAGINAL' | 'C_SECTION' | 'ASSISTED';
+export type PlaceOfBirth = 'THIS_HOSPITAL' | 'OUTSIDE' | 'OTHER';
+
+export type RegisterInfantBody = {
+  fullName?: string;
+  gender: Gender;
+  dateOfBirth: string;
+  dobTime?: string;
+  motherPatientId?: string;
+  motherName?: string;
+  motherNationalId?: string;
+  motherMobile?: string;
+  fatherName?: string;
+  fatherMobile?: string;
+  placeOfBirth: PlaceOfBirth;
+  deliveryType: DeliveryType;
+  apgar1Min?: number;
+  apgar5Min?: number;
+  birthWeightKg?: string;
+  lengthCm?: string;
+  ofcCm?: string;
+  gestationalAgeWeeks?: number;
+  gestationalAgeDays?: number;
+  guardianName: string;
+  guardianRelationship?: string;
+  guardianMobile?: string;
+  guardianNationalId?: string;
+  vip: boolean;
+};
+
+export async function registerInfant(body: RegisterInfantBody): Promise<PatientResponse> {
+  const res = await api.post('/patients/infants', body);
+  return res.data;
+}

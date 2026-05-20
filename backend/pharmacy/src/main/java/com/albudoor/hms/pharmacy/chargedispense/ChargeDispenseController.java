@@ -1,0 +1,27 @@
+package com.albudoor.hms.pharmacy.chargedispense;
+
+import com.albudoor.hms.pharmacy.api.DispenseResponse;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/dispenses")
+@PreAuthorize("hasAnyRole('PHARMACIST','ADMIN')")
+public class ChargeDispenseController {
+
+    private final ChargeDispenseHandler handler;
+
+    public ChargeDispenseController(ChargeDispenseHandler handler) {
+        this.handler = handler;
+    }
+
+    @PostMapping("/{id}/charge")
+    public DispenseResponse charge(@PathVariable UUID id) {
+        return DispenseResponse.from(handler.handle(id));
+    }
+}

@@ -49,7 +49,9 @@ public class RegisterNewPatientHandler {
         );
 
         Patient saved = patients.save(patient);
-        saved.pullDomainEvents().forEach(eventPublisher::publishEvent);
+        // Pull events from the source reference; merge() on pre-assigned ids returns a
+        // different managed instance with no carried-over domain events.
+        patient.pullDomainEvents().forEach(eventPublisher::publishEvent);
         return saved;
     }
 

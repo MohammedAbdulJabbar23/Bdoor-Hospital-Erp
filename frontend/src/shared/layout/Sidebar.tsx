@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
-import { navGroups } from '../nav/routes';
+import { useMemo } from 'react';
+import { visibleNav } from '../nav/routes';
+import { useAuthStore } from '../auth/authStore';
 import { cn } from '../ui/cn';
 import { Logo } from '../ui/Logo';
 
@@ -12,6 +14,8 @@ type Props = {
 
 export function Sidebar({ collapsed, onToggle }: Props) {
   const { t } = useTranslation();
+  const roles = useAuthStore((s) => s.user?.roles ?? []);
+  const navGroups = useMemo(() => visibleNav(roles), [roles]);
 
   return (
     <aside

@@ -130,6 +130,10 @@ public class Patient extends AggregateRoot {
         this.archived = true;
     }
 
+    public void unarchive() {
+        this.archived = false;
+    }
+
     private static void validateCommon(String mrn, String fullName, Gender gender, LocalDate dob) {
         if (mrn == null || mrn.isBlank()) {
             throw new DomainException("PATIENT_MRN_REQUIRED", "MRN is required");
