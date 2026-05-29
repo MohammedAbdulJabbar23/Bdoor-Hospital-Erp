@@ -4,6 +4,7 @@ import com.albudoor.hms.app.IntegrationTest;
 import com.albudoor.hms.cashier.domain.PaymentStatus;
 import com.albudoor.hms.cashier.infrastructure.PaymentRepository;
 import com.albudoor.hms.premature.domain.AdmissionStatus;
+import com.albudoor.hms.premature.domain.Bed;
 import com.albudoor.hms.premature.domain.BedStatus;
 import com.albudoor.hms.premature.infrastructure.BedRepository;
 import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
@@ -65,17 +66,16 @@ class AdmitFlowIT extends IntegrationTest {
         return new String[]{patientId, mrn, (String) visit.get("id")};
     }
 
-    private String availableBedId() {
-        return beds.findAllByOrderByCodeAsc().stream()
-                .filter(b -> b.getStatus() == BedStatus.AVAILABLE && b.isActive())
-                .findFirst().orElseThrow().getId().toString();
+    private String freshBedId() {
+        Bed bed = beds.save(Bed.create("PREM-IT-" + System.nanoTime(), "IT"));
+        return bed.getId().toString();
     }
 
     @Test
     void admit_then_approve_initial_marks_under_care_and_occupies_bed() {
         String[] s = seedPrematureVisit();
         String visitId = s[2];
-        String bedId = availableBedId();
+        String bedId = freshBedId();
 
         Map<?, ?> admission = post("/api/premature/admissions",
                 Map.of("visitId", visitId, "bedId", bedId, "stayValue", 3, "stayUnit", "DAYS"),
@@ -100,7 +100,7 @@ class AdmitFlowIT extends IntegrationTest {
     void admit_then_reject_initial_releases_bed_and_cancels() {
         String[] s = seedPrematureVisit();
         String visitId = s[2];
-        String bedId = availableBedId();
+        String bedId = freshBedId();
 
         Map<?, ?> admission = post("/api/premature/admissions",
                 Map.of("visitId", visitId, "bedId", bedId, "stayValue", 2, "stayUnit", "DAYS"),

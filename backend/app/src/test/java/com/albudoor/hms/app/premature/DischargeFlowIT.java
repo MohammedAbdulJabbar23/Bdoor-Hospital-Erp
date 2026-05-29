@@ -5,6 +5,7 @@ import com.albudoor.hms.cashier.domain.PaymentStage;
 import com.albudoor.hms.cashier.domain.PaymentStatus;
 import com.albudoor.hms.cashier.infrastructure.PaymentRepository;
 import com.albudoor.hms.premature.domain.AdmissionStatus;
+import com.albudoor.hms.premature.domain.Bed;
 import com.albudoor.hms.premature.domain.BedStatus;
 import com.albudoor.hms.premature.infrastructure.BedRepository;
 import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
@@ -63,9 +64,7 @@ class DischargeFlowIT extends IntegrationTest {
         Map<?, ?> visit = post("/api/visits",
                 Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist", Map.class);
         String visitId = (String) visit.get("id");
-        String bedId = beds.findAllByOrderByCodeAsc().stream()
-                .filter(b -> b.getStatus() == BedStatus.AVAILABLE && b.isActive())
-                .findFirst().orElseThrow().getId().toString();
+        String bedId = beds.save(Bed.create("PREM-IT-" + System.nanoTime(), "IT")).getId().toString();
         Map<?, ?> adm = post("/api/premature/admissions",
                 Map.of("visitId", visitId, "bedId", bedId, "stayValue", 2, "stayUnit", "DAYS"),
                 "premature", Map.class);
