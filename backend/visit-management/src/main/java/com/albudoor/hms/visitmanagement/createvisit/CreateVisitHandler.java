@@ -42,7 +42,7 @@ public class CreateVisitHandler {
                 patient.getMrn(),
                 patient.getFullName(),
                 cmd.visitType(),
-                VisitOrigin.DIRECT_RETURNING,
+                cmd.origin() == null ? VisitOrigin.DIRECT_RETURNING : cmd.origin(),
                 cmd.assignedDoctorId()
         );
         Visit saved = visits.save(visit);

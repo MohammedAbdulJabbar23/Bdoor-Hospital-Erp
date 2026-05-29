@@ -98,7 +98,7 @@ public class OtcSaleController {
 
         // 1. Create a PHARMACY visit to anchor the cashier payment.
         Visit visit = createVisit.handle(new CreateVisitCommand(
-                patient.getId(), VisitType.PHARMACY, null));
+                patient.getId(), VisitType.PHARMACY, null, null));
 
         // 2. Resolve catalogue items and build dispense lines (priced from catalogue).
         List<DispenseLine> dispenseLines = new ArrayList<>();
