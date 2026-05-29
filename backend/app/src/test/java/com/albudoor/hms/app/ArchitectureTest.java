@@ -78,4 +78,24 @@ class ArchitectureTest {
                 .whereLayer("infrastructure").mayOnlyAccessLayers("domain");
         rule.check(CLASSES);
     }
+
+    @Test
+    void layeredWithinPremature() {
+        ArchRule rule = layeredArchitecture()
+                .consideringOnlyDependenciesInLayers()
+                .layer("domain").definedBy("..premature.domain..")
+                .layer("application").definedBy(
+                        "..premature.createbed..",
+                        "..premature.updatebed..",
+                        "..premature.listbeds..",
+                        "..premature.admitpatient..",
+                        "..premature.extendstay..",
+                        "..premature.finishtreatment..",
+                        "..premature.listadmissions..",
+                        "..premature.bridge..")
+                .layer("infrastructure").definedBy("..premature.infrastructure..")
+                .whereLayer("application").mayOnlyAccessLayers("domain", "infrastructure")
+                .whereLayer("infrastructure").mayOnlyAccessLayers("domain");
+        rule.check(CLASSES);
+    }
 }
