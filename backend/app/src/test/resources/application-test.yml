@@ -1,0 +1,23 @@
+# Datasource is provided by the Testcontainers @ServiceConnection. Keep Flyway on and
+# ddl-auto=validate so tests run against the real migrated schema, exactly like prod.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+hms:
+  security:
+    jwt:
+      secret: ZGV2LW9ubHktc2VjcmV0LXJlcGxhY2UtaW4tcHJvZHVjdGlvbi1tdXN0LWJlLTI1Ni1iaXRz
+      ttl: PT8H
+      issuer: hms.albudoor
+
+logging:
+  level:
+    com.albudoor.hms: INFO
+    org.testcontainers: INFO
