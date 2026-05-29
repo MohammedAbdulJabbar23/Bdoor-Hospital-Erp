@@ -85,7 +85,7 @@ export function PatientProfilePage() {
     onSuccess: async (visit) => {
       toast.success(`Visit ${visit.visitDisplayId} started`);
       await queryClient.invalidateQueries({ queryKey: ['clinical-history', id] });
-      navigate('/reception/queue');
+      navigate(visit.visitType === 'PREMATURE' ? '/departments/premature' : '/reception/queue');
     },
     onError: (err) => toast.error(extractApiError(err)?.message ?? 'Could not start visit'),
   });
@@ -197,7 +197,7 @@ export function PatientProfilePage() {
             </button>
           </div>
           <div className="flex flex-wrap gap-2 p-4">
-            {(['LABORATORY', 'RADIOLOGY', 'ECO'] as VisitType[]).map((vt) => {
+            {(['LABORATORY', 'RADIOLOGY', 'ECO', 'PREMATURE'] as VisitType[]).map((vt) => {
               const Icon = TYPE_ICON[vt];
               return (
                 <Button
