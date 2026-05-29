@@ -109,7 +109,7 @@ class DischargeFlowIT extends IntegrationTest {
     @Test
     void rejected_final_payment_keeps_case_open_for_retry_p12b() {
         String[] s = admitUnderCare();
-        String admissionId = s[0], visitId = s[1];
+        String admissionId = s[0], visitId = s[1], bedId = s[2];
         await().atMost(ofSeconds(5)).untilAsserted(() ->
                 assertThat(admissions.findById(UUID.fromString(admissionId)).get().getStatus())
                         .isEqualTo(AdmissionStatus.UNDER_CARE));
@@ -123,6 +123,21 @@ class DischargeFlowIT extends IntegrationTest {
                     .isEqualTo(AdmissionStatus.AWAITING_DISCHARGE_PAYMENT);
             assertThat(visits.findById(UUID.fromString(visitId)).get().getStatus())
                     .isEqualTo(VisitStatus.AWAITING_FINAL_PAYMENT);
+        });
+
+        // P12b: re-issue a fresh discharge payment and approve it to genuinely close the case.
+        post("/api/premature/admissions/" + admissionId + "/reissue-discharge-payment",
+                null, "premature", Map.class);
+        post("/api/payments/" + pendingFinal(visitId) + "/approve",
+                Map.of("paymentMethod", "CASH"), "cashier", Map.class);
+
+        await().atMost(ofSeconds(5)).untilAsserted(() -> {
+            assertThat(admissions.findById(UUID.fromString(admissionId)).get().getStatus())
+                    .isEqualTo(AdmissionStatus.CLOSED);
+            assertThat(beds.findById(UUID.fromString(bedId)).get().getStatus())
+                    .isEqualTo(BedStatus.AVAILABLE);
+            assertThat(visits.findById(UUID.fromString(visitId)).get().getStatus())
+                    .isEqualTo(VisitStatus.COMPLETED);
         });
     }
 }
