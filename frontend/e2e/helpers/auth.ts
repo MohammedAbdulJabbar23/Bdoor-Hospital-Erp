@@ -10,7 +10,9 @@ export type Role =
   | 'lab'
   | 'nurse'
   | 'pharmacist'
-  | 'radiology';
+  | 'radiology'
+  | 'premature'
+  | 'receptionist';
 
 export async function login(page: Page, username: Role, password = username) {
   await page.goto('/login');
