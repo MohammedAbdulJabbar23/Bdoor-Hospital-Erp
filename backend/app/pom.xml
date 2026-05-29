@@ -54,6 +54,10 @@
             <groupId>com.albudoor.hms</groupId>
             <artifactId>pharmacy</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.albudoor.hms</groupId>
+            <artifactId>premature</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

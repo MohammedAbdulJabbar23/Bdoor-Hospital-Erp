@@ -16,5 +16,7 @@ public enum ServiceCategory {
     /** Emergency department services — the 40-item Albudoor sheet (HMS-BRD-REC-004 §6.6). */
     EMERGENCY,
     /** Pharmacy drug catalogue. */
-    DRUG
+    DRUG,
+    /** Premature unit admission / discharge / stay billing (HMS-BRD-REC-005). */
+    PREMATURE
 }

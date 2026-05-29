@@ -40,6 +40,7 @@
         <module>department-services</module>
         <module>clinical-case</module>
         <module>pharmacy</module>
+        <module>premature</module>
         <module>app</module>
     </modules>
 
@@ -93,6 +94,11 @@
             <dependency>
                 <groupId>com.albudoor.hms</groupId>
                 <artifactId>pharmacy</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.albudoor.hms</groupId>
+                <artifactId>premature</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
