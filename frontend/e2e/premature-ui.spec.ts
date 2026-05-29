@@ -7,10 +7,14 @@ import { registerPatient, API_BASE } from './helpers/seeds';
  * HMS-BRD-REC-005 — Premature workspace UI: premature staff assigns a bed from the queue.
  */
 test('premature staff can admit an incoming patient to a bed via the workspace UI', async ({ page }) => {
-  // Seed a PREMATURE visit through the API.
+  // Seed a PREMATURE visit + a dedicated AVAILABLE bed through the API (so the admit
+  // dialog always has a selectable bed regardless of what prior runs left occupied).
   const admin = await authedContext('admin');
   const patient = await registerPatient(admin, { gender: 'FEMALE' });
   await admin.post(`${API_BASE}/visits`, { data: { patientId: patient.id, visitType: 'PREMATURE' } });
+  await admin.post(`${API_BASE}/premature/beds`, {
+    data: { code: `PREM-UI-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`, room: 'E2E' },
+  });
   await admin.dispose();
 
   // Premature staff opens the workspace.

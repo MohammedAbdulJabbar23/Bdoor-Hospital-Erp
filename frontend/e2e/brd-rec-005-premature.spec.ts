@@ -15,11 +15,14 @@ async function startPrematureVisit(admin: import('@playwright/test').APIRequestC
   return { patient, visit: await vr.json() };
 }
 
+// Create a dedicated bed per test so specs don't compete for the small seeded bed pool
+// (and aren't affected by beds left OCCUPIED by prior runs / other tests). The `premature`
+// and `admin` users may create beds.
 async function firstAvailableBedId(api: import('@playwright/test').APIRequestContext): Promise<string> {
-  const beds = await (await api.get(`${API_BASE}/premature/beds`)).json();
-  const free = beds.find((b: any) => b.status === 'AVAILABLE' && b.active);
-  if (!free) throw new Error('no available premature bed');
-  return free.id;
+  const code = `PREM-E2E-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const res = await api.post(`${API_BASE}/premature/beds`, { data: { code, room: 'E2E' } });
+  if (!res.ok()) throw new Error(`create bed failed: ${res.status()} ${await res.text()}`);
+  return (await res.json()).id;
 }
 
 async function pendingPayment(api: import('@playwright/test').APIRequestContext, visitId: string, stage: string) {
