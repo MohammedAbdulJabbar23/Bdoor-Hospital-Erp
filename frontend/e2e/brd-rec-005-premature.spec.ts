@@ -196,6 +196,21 @@ test.describe('REC-005 Premature admission spine', () => {
       expect(v.status).toBe('AWAITING_FINAL_PAYMENT');
     }).toPass({ timeout: 10_000 });
 
+    // Re-issue the discharge (final) payment, approve it, and the case closes.
+    const reissue = await premature.post(`${API_BASE}/premature/admissions/${admission.id}/reissue-discharge-payment`, { data: {} });
+    expect(reissue.ok()).toBeTruthy();
+
+    // pendingPayment returns the first PENDING FINAL for this visit (the rejected one is filtered out by status=PENDING).
+    const reissuedPay = await pendingPayment(cashier, visit.id, 'FINAL');
+    await cashier.post(`${API_BASE}/payments/${reissuedPay.id}/approve`, { data: { paymentMethod: 'CASH' } });
+
+    await expect(async () => {
+      const closed = await (await premature.get(`${API_BASE}/premature/admissions?status=CLOSED`)).json();
+      expect(closed.some((a: any) => a.id === admission.id)).toBeTruthy();
+      const v = await (await admin.get(`${API_BASE}/visits/${visit.id}`)).json();
+      expect(v.status).toBe('COMPLETED');
+    }).toPass({ timeout: 10_000 });
+
     await admin.dispose(); await premature.dispose(); await cashier.dispose();
   });
 });
