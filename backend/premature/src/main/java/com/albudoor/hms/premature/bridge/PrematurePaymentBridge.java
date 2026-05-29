@@ -21,8 +21,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * INITIAL approved -> admission UNDER_CARE, bed OCCUPIED.
  * INITIAL rejected -> bed released, admission CANCELLED, visit cancelled.
- * FINAL approved -> admission CLOSED, bed discharged (added in Phase 7).
- * FINAL rejected -> no-op: admission stays AWAITING_DISCHARGE_PAYMENT (P12b; Phase 7).
+ * FINAL approved -> admission CLOSED, bed discharged.
+ * FINAL rejected -> intentional no-op: admission stays AWAITING_DISCHARGE_PAYMENT so the
+ *                   case stays open and a fresh discharge payment can be re-issued (P12b).
  */
 @Component
 public class PrematurePaymentBridge {
@@ -67,7 +68,6 @@ public class PrematurePaymentBridge {
                         admission.getId(), admission.getBedCode(), event.paymentId());
             });
         }
-        // FINAL approval added in Phase 7.
     }
 
     @TransactionalEventListener
@@ -92,7 +92,7 @@ public class PrematurePaymentBridge {
         }
         // FINAL rejection (P12b): the generic PaymentVisitBridge is guarded to skip PREMATURE
         // visits, so the visit stays AWAITING_FINAL_PAYMENT and the admission stays
-        // AWAITING_DISCHARGE_PAYMENT — the case remains open and a new FINAL payment can be
-        // issued via finish-treatment retry. No state change here by design.
+        // AWAITING_DISCHARGE_PAYMENT — the case remains open and a fresh FINAL payment can be
+        // issued via the reissue-discharge-payment endpoint. No state change here by design.
     }
 }

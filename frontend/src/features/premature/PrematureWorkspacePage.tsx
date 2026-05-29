@@ -6,6 +6,7 @@ import { Baby, BedDouble, Clock, CheckCircle2 } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import {
   listBeds, listAdmissions, listIncomingPremature, admitPatient, extendStay, finishTreatment,
+  reissueDischargePayment,
   type Bed, type PrematureVisit, type StayUnit,
 } from './api';
 
@@ -59,6 +60,12 @@ export function PrematureWorkspacePage() {
     onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
   });
 
+  const reissueMut = useMutation({
+    mutationFn: (id: string) => reissueDischargePayment(id),
+    onSuccess: async () => { toast.success(t('premature.toast.reissued')); await invalidate(); },
+    onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
+  });
+
   return (
     <div className="space-y-6 p-1">
       <header className="flex items-center gap-3">
@@ -107,7 +114,14 @@ export function PrematureWorkspacePage() {
         </div>
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
           {(beds ?? []).map((bed) => (
-            <BedCard key={bed.id} bed={bed} onFinish={finishMut.mutate} onExtend={extendMut.mutate} t={t} />
+            <BedCard
+              key={bed.id}
+              bed={bed}
+              onFinish={finishMut.mutate}
+              onExtend={extendMut.mutate}
+              onReissue={reissueMut.mutate}
+              t={t}
+            />
           ))}
         </div>
       </section>
@@ -126,11 +140,12 @@ export function PrematureWorkspacePage() {
 }
 
 function BedCard({
-  bed, onFinish, onExtend, t,
+  bed, onFinish, onExtend, onReissue, t,
 }: {
   bed: Bed;
   onFinish: (id: string) => void;
   onExtend: (a: { id: string; value: number; unit: StayUnit }) => void;
+  onReissue: (id: string) => void;
   t: (k: string) => string;
 }) {
   const occ = bed.occupant;
@@ -185,7 +200,17 @@ function BedCard({
             </div>
           )}
           {occ.admissionStatus === 'AWAITING_DISCHARGE_PAYMENT' && (
-            <div className="mt-1 text-[11px] text-amber-700">{t('premature.awaitingDischarge')}</div>
+            <div className="mt-1">
+              <div className="text-[11px] text-amber-700">{t('premature.awaitingDischarge')}</div>
+              <button
+                type="button"
+                onClick={() => onReissue(occ.admissionId)}
+                className="mt-2 rounded border border-ink-200 px-2 py-1 text-[11px] hover:bg-ink-50"
+                data-testid={`reissue-${bed.code}`}
+              >
+                {t('premature.reissueDischarge')}
+              </button>
+            </div>
           )}
         </div>
       )}

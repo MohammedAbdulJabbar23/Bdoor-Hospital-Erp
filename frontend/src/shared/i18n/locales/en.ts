@@ -188,6 +188,7 @@ export default {
     extend1Day: 'Extend +1 day',
     finishTreatment: 'Finish treatment',
     awaitingDischarge: 'Awaiting discharge payment',
+    reissueDischarge: 'Re-issue discharge payment',
     expiringSoon: 'Stay expiring soon',
     bedStatus: {
       AVAILABLE: 'Available',
@@ -198,6 +199,7 @@ export default {
       admitted: 'Patient admitted; initial payment sent to cashier',
       finished: 'Treatment finished; discharge payment sent to cashier',
       extended: 'Period of stay extended',
+      reissued: 'Discharge payment re-issued',
       bedCreated: 'Bed created',
       error: 'Action failed',
     },

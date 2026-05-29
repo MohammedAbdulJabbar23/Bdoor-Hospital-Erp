@@ -107,3 +107,8 @@ export async function finishTreatment(admissionId: string): Promise<Admission> {
   const res = await api.post(`/premature/admissions/${admissionId}/finish-treatment`, {});
   return res.data;
 }
+
+export async function reissueDischargePayment(admissionId: string): Promise<Admission> {
+  const res = await api.post(`/premature/admissions/${admissionId}/reissue-discharge-payment`, {});
+  return res.data;
+}

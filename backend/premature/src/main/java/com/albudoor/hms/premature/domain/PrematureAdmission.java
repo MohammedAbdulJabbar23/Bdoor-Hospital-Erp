@@ -143,6 +143,13 @@ public class PrematureAdmission extends AggregateRoot {
         this.status = AdmissionStatus.AWAITING_DISCHARGE_PAYMENT;
     }
 
+    /** Re-issue a discharge payment after a prior FINAL payment was rejected (BRD P12b). */
+    public void reissueDischargePayment(UUID newFinalPaymentId) {
+        require(AdmissionStatus.AWAITING_DISCHARGE_PAYMENT, "re-issue discharge payment");
+        this.finalPaymentId = newFinalPaymentId;
+        // status stays AWAITING_DISCHARGE_PAYMENT; only the linked payment changes.
+    }
+
     public void close() {
         require(AdmissionStatus.AWAITING_DISCHARGE_PAYMENT, "close");
         this.status = AdmissionStatus.CLOSED;

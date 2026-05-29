@@ -82,4 +82,38 @@ class PrematureAdmissionTest {
         a.markUnderCare();
         assertThatThrownBy(a::close).isInstanceOf(DomainException.class);
     }
+
+    @Test
+    void extend_stay_succeeds_while_treatment_finished() {
+        PrematureAdmission a = open(StayUnit.DAYS, 2);
+        a.linkInitialPayment(UUID.randomUUID());
+        a.markUnderCare();
+        a.finishTreatment();
+        assertThat(a.getStatus()).isEqualTo(AdmissionStatus.TREATMENT_FINISHED);
+        var before = a.getStayExpiresAt();
+        a.extendStay(1, StayUnit.DAYS);
+        assertThat(a.getStayExpiresAt()).isEqualTo(before.plus(1, ChronoUnit.DAYS));
+    }
+
+    @Test
+    void reissue_discharge_payment_relinks_and_keeps_status() {
+        PrematureAdmission a = open(StayUnit.DAYS, 2);
+        a.linkInitialPayment(UUID.randomUUID());
+        a.markUnderCare();
+        a.finishTreatment();
+        a.scheduleDischargePayment(UUID.randomUUID());
+        UUID newPaymentId = UUID.randomUUID();
+        a.reissueDischargePayment(newPaymentId);
+        assertThat(a.getStatus()).isEqualTo(AdmissionStatus.AWAITING_DISCHARGE_PAYMENT);
+        assertThat(a.getFinalPaymentId()).isEqualTo(newPaymentId);
+    }
+
+    @Test
+    void reissue_discharge_payment_rejected_unless_awaiting_discharge() {
+        PrematureAdmission a = open(StayUnit.DAYS, 2);
+        a.linkInitialPayment(UUID.randomUUID());
+        a.markUnderCare();
+        assertThatThrownBy(() -> a.reissueDischargePayment(UUID.randomUUID()))
+                .isInstanceOf(DomainException.class);
+    }
 }

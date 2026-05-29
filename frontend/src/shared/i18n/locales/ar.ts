@@ -189,6 +189,7 @@ export default {
     extend1Day: 'تمديد +يوم',
     finishTreatment: 'إنهاء العلاج',
     awaitingDischarge: 'بانتظار دفعة الخروج',
+    reissueDischarge: 'إعادة إصدار دفعة الخروج',
     expiringSoon: 'الإقامة على وشك الانتهاء',
     bedStatus: {
       AVAILABLE: 'متاح',
@@ -199,6 +200,7 @@ export default {
       admitted: 'تم إدخال المريض؛ أُرسلت دفعة الإدخال إلى الصندوق',
       finished: 'انتهى العلاج؛ أُرسلت دفعة الخروج إلى الصندوق',
       extended: 'تم تمديد مدة الإقامة',
+      reissued: 'أُعيد إصدار دفعة الخروج',
       bedCreated: 'تم إنشاء السرير',
       error: 'فشل الإجراء',
     },

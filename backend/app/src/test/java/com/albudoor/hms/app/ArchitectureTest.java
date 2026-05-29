@@ -91,6 +91,7 @@ class ArchitectureTest {
                         "..premature.admitpatient..",
                         "..premature.extendstay..",
                         "..premature.finishtreatment..",
+                        "..premature.reissuedischargepayment..",
                         "..premature.listadmissions..",
                         "..premature.bridge..")
                 .layer("infrastructure").definedBy("..premature.infrastructure..")
