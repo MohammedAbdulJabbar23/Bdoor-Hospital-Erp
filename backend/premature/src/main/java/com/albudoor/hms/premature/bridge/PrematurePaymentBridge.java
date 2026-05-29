@@ -55,6 +55,18 @@ public class PrematurePaymentBridge {
                         admission.getId(), admission.getBedCode(), event.paymentId());
             });
         }
+        if (event.stage() == PaymentStage.FINAL) {
+            admissions.findByFinalPaymentId(event.paymentId()).ifPresent(admission -> {
+                admission.close();
+                admissions.save(admission);
+                beds.findById(admission.getBedId()).ifPresent(bed -> {
+                    bed.discharge();
+                    beds.save(bed);
+                });
+                log.info("Premature admission {} CLOSED, bed {} discharged (final payment {})",
+                        admission.getId(), admission.getBedCode(), event.paymentId());
+            });
+        }
         // FINAL approval added in Phase 7.
     }
 
@@ -78,6 +90,9 @@ public class PrematurePaymentBridge {
                         admission.getId(), admission.getBedCode(), event.paymentId());
             });
         }
-        // FINAL rejection (P12b) added in Phase 7.
+        // FINAL rejection (P12b): the generic PaymentVisitBridge is guarded to skip PREMATURE
+        // visits, so the visit stays AWAITING_FINAL_PAYMENT and the admission stays
+        // AWAITING_DISCHARGE_PAYMENT — the case remains open and a new FINAL payment can be
+        // issued via finish-treatment retry. No state change here by design.
     }
 }
