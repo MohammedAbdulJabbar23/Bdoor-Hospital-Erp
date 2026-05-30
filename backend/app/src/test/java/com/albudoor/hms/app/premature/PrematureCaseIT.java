@@ -95,8 +95,39 @@ class PrematureCaseIT extends IntegrationTest {
     void recording_a_tour_is_forbidden_for_cashier() {
         String adm = admitUnderCare();
         var res = rest.exchange("/api/premature/admissions/" + adm + "/tours", HttpMethod.POST,
-                new HttpEntity<>(Map.of("tourType","MORNING","respRate",40,"spo2",96,"pulseRate",140,"uop","x","babyTempC",36.8),
+                new HttpEntity<>(Map.ofEntries(
+                        Map.entry("tourType","MORNING"), Map.entry("respRate",40), Map.entry("spo2",96),
+                        Map.entry("pulseRate",140), Map.entry("respSupport", List.of("CPAP")),
+                        Map.entry("uop","x"), Map.entry("babyTempC",36.8)),
                         auth("cashier")), String.class);
         assertThat(res.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void case_prefill_is_populated_from_a_registered_infant() {
+        var infant = post("/api/patients/infants", Map.ofEntries(
+                Map.entry("gender", "MALE"), Map.entry("dateOfBirth", "2026-05-25"),
+                Map.entry("placeOfBirth", "THIS_HOSPITAL"), Map.entry("deliveryType", "VAGINAL"),
+                Map.entry("guardianName", "Guardian"), Map.entry("motherName", "Mother IT"),
+                Map.entry("birthWeightKg", 1.2),
+                Map.entry("gestationalAgeWeeks", 32), Map.entry("gestationalAgeDays", 4),
+                Map.entry("lengthCm", 42.0), Map.entry("ofcCm", 30.0), Map.entry("vip", false)),
+                "receptionist", Map.class);
+        var visit = post("/api/visits", Map.of("patientId", infant.get("id"), "visitType", "PREMATURE"), "receptionist", Map.class);
+        String visitId = (String) visit.get("id");
+        Bed bed = beds.save(Bed.create("PREM-INF-" + System.nanoTime(), "IT"));
+        var adm = post("/api/premature/admissions",
+                Map.of("visitId", visitId, "bedId", bed.getId().toString(), "stayValue", 3, "stayUnit", "DAYS"),
+                "premature", Map.class);
+
+        var caseBody = rest.exchange("/api/premature/admissions/" + adm.get("id") + "/case",
+                org.springframework.http.HttpMethod.GET, new org.springframework.http.HttpEntity<>(auth("premature")), Map.class).getBody();
+        var prefill = (Map<String, Object>) caseBody.get("prefill");
+        assertThat(prefill).isNotNull();
+        assertThat(prefill.get("gestationalAgeWeeks")).isEqualTo(32);
+        assertThat(prefill.get("birthWeightKg")).isNotNull();
+        assertThat(prefill.get("lengthCm")).isNotNull();
+        assertThat(prefill.get("ofcCm")).isNotNull();
+        assertThat(prefill.get("ageText")).isNotNull();
     }
 }

@@ -55,6 +55,10 @@ public class SignatureController {
             @RequestParam(value = "signerName", required = false) String signerName
     ) throws IOException {
         if (file.isEmpty()) throw new DomainException("SIGNATURE_EMPTY", "Signature image is empty");
+        String ct = file.getContentType();
+        if (ct == null || !ct.startsWith("image/")) {
+            throw new DomainException("SIGNATURE_NOT_IMAGE", "Signature must be an image");
+        }
         PrematureForm form = forms.findByAdmissionId(id).orElseGet(() -> {
             PrematureAdmission adm = admissions.findById(id)
                     .orElseThrow(() -> new NotFoundException("Admission not found: " + id));

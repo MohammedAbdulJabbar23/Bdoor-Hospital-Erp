@@ -45,4 +45,14 @@ class PrematureTourTest {
         assertThatThrownBy(() -> PrematureTour.record(UUID.randomUUID(), TourType.MORNING, UUID.randomUUID(), missing))
                 .isInstanceOf(DomainException.class);
     }
+
+    @Test
+    void requires_resp_support() {
+        TourVitals noRs = new TourVitals(40, 96, 140, java.util.Set.of(),
+                "Normal", "2 ml/kg", "EBM", "No", "No", "Right hand", "D10 4ml/h",
+                new java.math.BigDecimal("36.8"), null, null, null, null, null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> PrematureTour.record(java.util.UUID.randomUUID(), TourType.MORNING, java.util.UUID.randomUUID(), noRs))
+                .isInstanceOf(com.albudoor.hms.platform.exception.DomainException.class);
+    }
 }

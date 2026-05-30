@@ -73,9 +73,10 @@ public class PrematureTour extends AggregateRoot {
         if (tourType == null) throw new DomainException("TOUR_TYPE_REQUIRED", "tour type is required");
         if (v == null) throw new DomainException("VITALS_REQUIRED", "tour vitals are required");
         if (v.respRate() == null || v.spo2() == null || v.pulseRate() == null
-                || v.uop() == null || v.uop().isBlank() || v.babyTempC() == null) {
+                || v.uop() == null || v.uop().isBlank() || v.babyTempC() == null
+                || v.respSupport() == null || v.respSupport().isEmpty()) {
             throw new DomainException("TOUR_VITALS_INCOMPLETE",
-                    "respRate, SpO2, pulse, UOP and baby temp are mandatory per tour");
+                    "respRate, SpO2, pulse, UOP, baby temp and resp support are mandatory per tour");
         }
         PrematureTour t = new PrematureTour();
         t.id = UUID.randomUUID();

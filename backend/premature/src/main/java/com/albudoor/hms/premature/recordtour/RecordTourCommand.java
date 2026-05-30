@@ -3,6 +3,7 @@ package com.albudoor.hms.premature.recordtour;
 import com.albudoor.hms.premature.domain.RespSupport;
 import com.albudoor.hms.premature.domain.TourType;
 import com.albudoor.hms.premature.domain.TourVitals;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -13,7 +14,7 @@ import java.util.Set;
 public record RecordTourCommand(
         @NotNull TourType tourType,
         @NotNull Integer respRate, @NotNull Integer spo2, @NotNull Integer pulseRate,
-        List<RespSupport> respSupport,
+        @NotEmpty List<RespSupport> respSupport,
         String bowelMotion, @NotNull String uop, String feeding, String vomiting, String jaundice,
         String ivAccess, String ivFluid,
         @NotNull BigDecimal babyTempC, BigDecimal incubatorTempC, Integer humidity,

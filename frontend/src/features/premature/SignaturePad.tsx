@@ -17,7 +17,10 @@ export function SignaturePad({
   const [editing, setEditing] = useState(!meta.present);
 
   useEffect(() => {
-    if (meta.present) fetchSignatureUrl(admissionId, slot).then(setSavedUrl).catch(() => {});
+    if (!meta.present) return;
+    let url: string | null = null;
+    fetchSignatureUrl(admissionId, slot).then((u) => { url = u; setSavedUrl(u); }).catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
   }, [admissionId, slot, meta.present]);
 
   const pos = (e: React.PointerEvent) => {
@@ -54,6 +57,7 @@ export function SignaturePad({
     }),
     onSuccess: async () => {
       toast.success(t('premature.form.signatureSaved'));
+      setSavedUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return prev; });
       const url = await fetchSignatureUrl(admissionId, slot).catch(() => null);
       setSavedUrl(url); setEditing(false); onSaved();
     },
