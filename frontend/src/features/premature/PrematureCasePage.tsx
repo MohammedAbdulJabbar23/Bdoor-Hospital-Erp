@@ -110,14 +110,14 @@ function FormTab({ c, admissionId, onSaved, t }: { c: PrematureCase; admissionId
     <form onSubmit={handleSubmit((v) => mut.mutate(v))} className="space-y-5" data-testid="prem-form">
       <Section title={t('premature.form.measurements')}>
         <Field label={t('premature.form.age') + ' *'}><input className={input} {...register('ageText')} data-testid="f-ageText" /></Field>
-        <Field label={t('premature.form.birthWeight') + ' (kg) *'}><input className={input} type="number" step="0.001" {...register('birthWeightKg')} /></Field>
+        <Field label={t('premature.form.birthWeight') + ' (kg) *'}><input className={input} type="number" step="0.001" {...register('birthWeightKg')} data-testid="f-birthWeightKg" /></Field>
         <Field label={t('premature.form.currentWeight') + ' (kg) *'}><input className={input} type="number" step="0.001" {...register('currentWeightKg')} data-testid="f-currentWeightKg" /></Field>
-        <Field label={t('premature.form.gaWeeks') + ' *'}><input className={input} type="number" {...register('gestationalAgeWeeks')} /></Field>
-        <Field label={t('premature.form.gaDays') + ' *'}><input className={input} type="number" {...register('gestationalAgeDays')} /></Field>
-        <Field label={t('premature.form.correctedGaWeeks') + ' *'}><input className={input} type="number" {...register('correctedGaWeeks')} /></Field>
-        <Field label={t('premature.form.correctedGaDays') + ' *'}><input className={input} type="number" {...register('correctedGaDays')} /></Field>
-        <Field label={t('premature.form.length') + ' (cm) *'}><input className={input} type="number" step="0.1" {...register('lengthCm')} /></Field>
-        <Field label={t('premature.form.ofc') + ' (cm) *'}><input className={input} type="number" step="0.1" {...register('ofcCm')} /></Field>
+        <Field label={t('premature.form.gaWeeks') + ' *'}><input className={input} type="number" {...register('gestationalAgeWeeks')} data-testid="f-gaWeeks" /></Field>
+        <Field label={t('premature.form.gaDays') + ' *'}><input className={input} type="number" {...register('gestationalAgeDays')} data-testid="f-gaDays" /></Field>
+        <Field label={t('premature.form.correctedGaWeeks') + ' *'}><input className={input} type="number" {...register('correctedGaWeeks')} data-testid="f-correctedGaWeeks" /></Field>
+        <Field label={t('premature.form.correctedGaDays') + ' *'}><input className={input} type="number" {...register('correctedGaDays')} data-testid="f-correctedGaDays" /></Field>
+        <Field label={t('premature.form.length') + ' (cm) *'}><input className={input} type="number" step="0.1" {...register('lengthCm')} data-testid="f-lengthCm" /></Field>
+        <Field label={t('premature.form.ofc') + ' (cm) *'}><input className={input} type="number" step="0.1" {...register('ofcCm')} data-testid="f-ofcCm" /></Field>
       </Section>
       <Section title={t('premature.form.clinicalPharmacy')}>
         <Field label={t('premature.form.feedingType') + ' *'}><input className={input} {...register('feedingType')} data-testid="f-feedingType" /></Field>

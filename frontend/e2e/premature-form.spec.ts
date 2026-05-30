@@ -24,18 +24,30 @@ async function seedUnderCare(): Promise<{ admissionId: string; bedCode: string }
   return { admissionId: adm.id, bedCode };
 }
 
+/** Fill all BRD-mandatory Premature Form fields and save; waits until the save lands
+ *  (signatures render only once the form exists). Doesn't rely on registration pre-fill. */
+async function fillMandatoryForm(page: import('@playwright/test').Page) {
+  await page.getByTestId('case-tab-form').click();
+  await page.getByTestId('f-ageText').fill('12 days');
+  await page.getByTestId('f-birthWeightKg').fill('1.2');
+  await page.getByTestId('f-currentWeightKg').fill('1.45');
+  await page.getByTestId('f-gaWeeks').fill('32');
+  await page.getByTestId('f-gaDays').fill('4');
+  await page.getByTestId('f-correctedGaWeeks').fill('34');
+  await page.getByTestId('f-correctedGaDays').fill('1');
+  await page.getByTestId('f-lengthCm').fill('42');
+  await page.getByTestId('f-ofcCm').fill('30');
+  await page.getByTestId('f-feedingType').fill('EBM');
+  await page.getByTestId('save-form').click();
+  await expect(page.getByTestId('canvas-RESIDENT')).toBeVisible({ timeout: 10_000 });
+}
+
 test('premature staff fill the Premature Form and record a tour', async ({ page }) => {
   const { admissionId } = await seedUnderCare();
   await login(page, 'premature');
   await page.goto(`/premature/admissions/${admissionId}`);
 
-  await page.getByTestId('case-tab-form').click();
-  await page.getByTestId('f-currentWeightKg').fill('1.45');
-  await page.getByTestId('f-feedingType').fill('EBM');
-  const age = page.getByTestId('f-ageText');
-  if (await age.count() && !(await age.inputValue())) await age.fill('12 days');
-  await page.getByTestId('save-form').click();
-  await expect(page.getByTestId('save-form')).toBeEnabled();
+  await fillMandatoryForm(page);
 
   await page.reload();
   await expect(page.getByTestId('f-currentWeightKg')).toHaveValue('1.45');
@@ -57,12 +69,7 @@ test('premature staff draw and save a resident signature', async ({ page }) => {
   await page.goto(`/premature/admissions/${admissionId}`);
 
   // Save the form first so the signatures section renders.
-  await page.getByTestId('case-tab-form').click();
-  await page.getByTestId('f-currentWeightKg').fill('1.45');
-  await page.getByTestId('f-feedingType').fill('EBM');
-  const age = page.getByTestId('f-ageText');
-  if (await age.count() && !(await age.inputValue())) await age.fill('12 days');
-  await page.getByTestId('save-form').click();
+  await fillMandatoryForm(page);
 
   // Draw on the resident signature canvas.
   const canvas = page.getByTestId('canvas-RESIDENT');
