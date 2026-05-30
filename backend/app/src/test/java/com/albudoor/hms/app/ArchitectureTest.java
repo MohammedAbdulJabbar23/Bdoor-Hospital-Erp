@@ -93,6 +93,10 @@ class ArchitectureTest {
                         "..premature.finishtreatment..",
                         "..premature.reissuedischargepayment..",
                         "..premature.listadmissions..",
+                        "..premature.getcase..",
+                        "..premature.upsertform..",
+                        "..premature.recordtour..",
+                        "..premature.signature..",
                         "..premature.bridge..")
                 .layer("infrastructure").definedBy("..premature.infrastructure..")
                 .whereLayer("application").mayOnlyAccessLayers("domain", "infrastructure")
