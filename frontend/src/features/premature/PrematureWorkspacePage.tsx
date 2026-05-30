@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Baby, BedDouble, Clock, CheckCircle2 } from 'lucide-react';
+import { Baby, BedDouble, Clock, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
+import { BedDetailPanel } from './BedDetailPanel';
 import {
   listBeds, listAdmissions, listIncomingPremature, admitPatient, extendStay, finishTreatment,
   reissueDischargePayment,
@@ -16,9 +17,10 @@ function isExpiringSoon(iso: string): boolean {
 }
 
 export function PrematureWorkspacePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [admitFor, setAdmitFor] = useState<PrematureVisit | null>(null);
+  const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
 
   const { data: beds } = useQuery({ queryKey: ['prem-beds'], queryFn: listBeds, refetchInterval: 15000 });
   const { data: admissions } = useQuery({
@@ -36,6 +38,22 @@ export function PrematureWorkspacePage() {
     () => (incoming ?? []).filter((v) => !admittedVisitIds.has(v.id)),
     [incoming, admittedVisitIds],
   );
+
+  // Drawer: full admission + bed derived from already-loaded data (no extra fetch).
+  const selectedAdmission = useMemo(
+    () => (admissions ?? []).find((a) => a.id === selectedAdmissionId) ?? null,
+    [admissions, selectedAdmissionId],
+  );
+  const selectedBed = useMemo(
+    () => (beds ?? []).find((b) => b.occupant?.admissionId === selectedAdmissionId) ?? null,
+    [beds, selectedAdmissionId],
+  );
+  // Auto-close when the selected admission leaves the active set (e.g. discharged).
+  useEffect(() => {
+    if (selectedAdmissionId && admissions && !admissions.some((a) => a.id === selectedAdmissionId)) {
+      setSelectedAdmissionId(null);
+    }
+  }, [admissions, selectedAdmissionId]);
 
   const invalidate = async () => {
     await Promise.all([
@@ -117,9 +135,7 @@ export function PrematureWorkspacePage() {
             <BedCard
               key={bed.id}
               bed={bed}
-              onFinish={finishMut.mutate}
-              onExtend={extendMut.mutate}
-              onReissue={reissueMut.mutate}
+              onOpen={() => bed.occupant && setSelectedAdmissionId(bed.occupant.admissionId)}
               t={t}
             />
           ))}
@@ -135,86 +151,90 @@ export function PrematureWorkspacePage() {
           t={t}
         />
       )}
+
+      {selectedBed && (
+        <BedDetailPanel
+          bed={selectedBed}
+          admission={selectedAdmission}
+          onClose={() => setSelectedAdmissionId(null)}
+          onExtend={extendMut.mutate}
+          onFinish={finishMut.mutate}
+          onReissue={reissueMut.mutate}
+          pending={extendMut.isPending || finishMut.isPending || reissueMut.isPending}
+          t={t}
+          dir={i18n.dir() === 'rtl' ? 'rtl' : 'ltr'}
+        />
+      )}
     </div>
   );
 }
 
 function BedCard({
-  bed, onFinish, onExtend, onReissue, t,
+  bed, onOpen, t,
 }: {
   bed: Bed;
-  onFinish: (id: string) => void;
-  onExtend: (a: { id: string; value: number; unit: StayUnit }) => void;
-  onReissue: (id: string) => void;
+  onOpen: () => void;
   t: (k: string) => string;
 }) {
   const occ = bed.occupant;
   const expiring = occ && isExpiringSoon(occ.stayExpiresAt);
-  return (
-    <div className="rounded-lg border border-ink-100 p-3" data-testid={`bed-${bed.code}`}>
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 font-mono text-sm font-semibold text-ink-900">
-          <BedDouble size={14} /> {bed.code}
-        </span>
-        <span
-          className={
-            'rounded-full px-2 py-0.5 text-[11px] font-medium ' +
-            (bed.status === 'AVAILABLE'
-              ? 'bg-emerald-50 text-emerald-700'
-              : bed.status === 'OCCUPIED'
-              ? 'bg-brand-50 text-brand-700'
-              : 'bg-amber-50 text-amber-700')
-          }
-          data-testid={`bed-status-${bed.code}`}
-        >
-          {t(`premature.bedStatus.${bed.status}`)}
-        </span>
+  const statusClass =
+    bed.status === 'AVAILABLE'
+      ? 'bg-emerald-50 text-emerald-700'
+      : bed.status === 'OCCUPIED'
+      ? 'bg-brand-50 text-brand-700'
+      : 'bg-amber-50 text-amber-700';
+
+  const header = (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-1.5 font-mono text-sm font-semibold text-ink-900">
+        <BedDouble size={14} /> {bed.code}
+      </span>
+      <span
+        className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + statusClass}
+        data-testid={`bed-status-${bed.code}`}
+      >
+        {t(`premature.bedStatus.${bed.status}`)}
+      </span>
+    </div>
+  );
+
+  // Empty bed — quiet, non-interactive tile.
+  if (!occ) {
+    return (
+      <div
+        className="rounded-lg border border-dashed border-ink-200 p-3 opacity-80"
+        data-testid={`bed-${bed.code}`}
+      >
+        {header}
+        <p className="mt-2 text-[11px] text-ink-400">{t('premature.detail.empty')}</p>
       </div>
-      {occ && (
-        <div className="mt-2 text-xs text-ink-600">
-          <div className="font-medium text-ink-900">{occ.patientName}</div>
-          <div className="font-mono text-[11px] text-ink-500">{occ.patientMrn}</div>
-          {expiring && (
-            <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
-              <Clock size={11} /> {t('premature.expiringSoon')}
-            </div>
-          )}
-          {occ.admissionStatus === 'UNDER_CARE' && (
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => onExtend({ id: occ.admissionId, value: 1, unit: 'DAYS' })}
-                className="rounded border border-ink-200 px-2 py-1 text-[11px] hover:bg-ink-50"
-                data-testid={`extend-${bed.code}`}
-              >
-                {t('premature.extend1Day')}
-              </button>
-              <button
-                type="button"
-                onClick={() => onFinish(occ.admissionId)}
-                className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-700"
-                data-testid={`finish-${bed.code}`}
-              >
-                <CheckCircle2 size={11} /> {t('premature.finishTreatment')}
-              </button>
-            </div>
-          )}
-          {occ.admissionStatus === 'AWAITING_DISCHARGE_PAYMENT' && (
-            <div className="mt-1">
-              <div className="text-[11px] text-amber-700">{t('premature.awaitingDischarge')}</div>
-              <button
-                type="button"
-                onClick={() => onReissue(occ.admissionId)}
-                className="mt-2 rounded border border-ink-200 px-2 py-1 text-[11px] hover:bg-ink-50"
-                data-testid={`reissue-${bed.code}`}
-              >
-                {t('premature.reissueDischarge')}
-              </button>
-            </div>
-          )}
+    );
+  }
+
+  // Occupied / pending — clickable, opens the detail drawer.
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group w-full rounded-lg border border-ink-100 p-3 text-start transition hover:border-brand-200 hover:bg-brand-50/40 focus:outline-none focus:ring-2 focus:ring-brand-200"
+      data-testid={`bed-${bed.code}`}
+      aria-label={`${bed.code} — ${occ.patientName}`}
+    >
+      {header}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-xs font-medium text-ink-900">{occ.patientName}</div>
+          <div className="truncate font-mono text-[11px] text-ink-500">{occ.patientMrn}</div>
+        </div>
+        <ChevronRight size={16} className="shrink-0 text-ink-300 group-hover:text-brand-600 rtl:rotate-180" />
+      </div>
+      {expiring && (
+        <div className="mt-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
+          <Clock size={11} /> {t('premature.expiringSoon')}
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
