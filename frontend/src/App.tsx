@@ -22,6 +22,7 @@ import { PharmacyQueuePage } from './features/pharmacy/PharmacyQueuePage';
 import { PharmacyInventoryPage } from './features/pharmacy/PharmacyInventoryPage';
 import { PrematureWorkspacePage } from '@/features/premature/PrematureWorkspacePage';
 import { BedAdminPage } from '@/features/premature/BedAdminPage';
+import { PrematureCasePage } from '@/features/premature/PrematureCasePage';
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/departments/emergency" element={<ComingSoonPage />} />
           <Route path="/departments/premature" element={<PrematureWorkspacePage />} />
           <Route path="/premature/beds" element={<BedAdminPage />} />
+          <Route path="/premature/admissions/:id" element={<PrematureCasePage />} />
           <Route path="/pharmacy" element={<PharmacyQueuePage />} />
           <Route path="/pharmacy/inventory" element={<PharmacyInventoryPage />} />
           <Route path="/cashier" element={<CashierQueuePage />} />

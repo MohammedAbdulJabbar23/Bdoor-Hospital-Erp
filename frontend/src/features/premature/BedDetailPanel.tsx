@@ -130,6 +130,14 @@ export function BedDetailPanel({
                 {t('premature.detail.viewHistory')}
                 <ChevronRight size={13} className="rtl:rotate-180" />
               </button>
+              <button
+                type="button" onClick={() => navigate(`/premature/admissions/${admission.id}`)}
+                className="mt-2 ms-3 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+                data-testid="bed-detail-open-case"
+              >
+                {t('premature.openCase')}
+                <ChevronRight size={13} className="rtl:rotate-180" />
+              </button>
 
               {/* Admission details */}
               <dl className="mt-5 space-y-2.5 text-xs">
