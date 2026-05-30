@@ -112,3 +112,64 @@ export async function reissueDischargePayment(admissionId: string): Promise<Admi
   const res = await api.post(`/premature/admissions/${admissionId}/reissue-discharge-payment`, {});
   return res.data;
 }
+
+export type RespSupport = 'MV' | 'CPAP' | 'HFNC' | 'NC' | 'ROOM_AIR';
+export type TourType = 'MORNING' | 'NIGHT';
+export type SignatureSlot = 'CLINICAL_PHARMACY' | 'RESIDENT' | 'SENIOR_RESIDENT';
+
+export type PrematureForm = {
+  id: string; admissionId: string; ageText: string | null;
+  birthWeightKg: number | null; birthWeightDate: string | null;
+  currentWeightKg: number | null; currentWeightDate: string | null;
+  gestationalAgeWeeks: number | null; gestationalAgeDays: number | null;
+  correctedGaWeeks: number | null; correctedGaDays: number | null;
+  lengthCm: number | null; lengthDate: string | null; ofcCm: number | null; ofcDate: string | null;
+  feedingType: string | null; kcalPerOz: number | null; enteralPerKg: number | null;
+  kcalPerKg: number | null; gir: number | null; pharmacyOthers: string | null;
+  lastCultureDate: string | null; sampleType: string | null; cultureResult: string | null;
+  prescriptionNotes: string | null; specialistDoctorNotes: string | null;
+  clinicalPharmacySignature: SigMeta; residentSignature: SigMeta; seniorResidentSignature: SigMeta;
+};
+export type SigMeta = { present: boolean; signerName: string | null; signedBy: string | null; signedAt: string | null };
+
+export type Tour = {
+  id: string; tourType: TourType; recordedAt: string; recordedBy: string | null;
+  respRate: number | null; spo2: number | null; pulseRate: number | null; respSupport: RespSupport[];
+  bowelMotion: string | null; uop: string | null; feeding: string | null; vomiting: string | null;
+  jaundice: string | null; ivAccess: string | null; ivFluid: string | null;
+  babyTempC: number | null; incubatorTempC: number | null; humidity: number | null;
+  nasalSeptum: string | null; rbs: number | null; others: string | null;
+};
+
+export type Prefill = {
+  ageText: string | null; birthWeightKg: number | null;
+  gestationalAgeWeeks: number | null; gestationalAgeDays: number | null;
+  lengthCm: number | null; ofcCm: number | null;
+};
+
+export type PrematureCase = { admission: Admission; form: PrematureForm | null; prefill: Prefill; tours: Tour[] };
+
+export async function getPrematureCase(admissionId: string): Promise<PrematureCase> {
+  const res = await api.get(`/premature/admissions/${admissionId}/case`);
+  return res.data;
+}
+export async function upsertPrematureForm(admissionId: string, body: Record<string, unknown>): Promise<PrematureForm> {
+  const res = await api.put(`/premature/admissions/${admissionId}/form`, body);
+  return res.data;
+}
+export async function recordTour(admissionId: string, body: Record<string, unknown>): Promise<Tour> {
+  const res = await api.post(`/premature/admissions/${admissionId}/tours`, body);
+  return res.data;
+}
+export async function uploadSignature(admissionId: string, slot: SignatureSlot, file: Blob, signerName: string): Promise<void> {
+  const fd = new FormData();
+  fd.append('file', file, 'signature.png');
+  fd.append('signerName', signerName);
+  await api.post(`/premature/admissions/${admissionId}/form/signatures/${slot}`, fd,
+    { headers: { 'Content-Type': 'multipart/form-data' } });
+}
+/** Fetch a stored signature as a blob object-URL (the <img> can't carry the Bearer token). */
+export async function fetchSignatureUrl(admissionId: string, slot: SignatureSlot): Promise<string> {
+  const res = await api.get(`/premature/admissions/${admissionId}/form/signatures/${slot}`, { responseType: 'blob' });
+  return URL.createObjectURL(res.data as Blob);
+}
