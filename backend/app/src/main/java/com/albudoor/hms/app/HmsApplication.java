@@ -9,6 +9,7 @@ import com.albudoor.hms.identity.IdentityAutoConfig;
 import com.albudoor.hms.patientregistry.PatientRegistryAutoConfig;
 import com.albudoor.hms.pharmacy.PharmacyAutoConfig;
 import com.albudoor.hms.platform.PlatformAutoConfig;
+import com.albudoor.hms.emergency.EmergencyAutoConfig;
 import com.albudoor.hms.premature.PrematureAutoConfig;
 import com.albudoor.hms.visitmanagement.VisitManagementAutoConfig;
 import org.springframework.boot.SpringApplication;
@@ -28,7 +29,8 @@ import org.springframework.context.annotation.Import;
         DepartmentServicesAutoConfig.class,
         ClinicalCaseAutoConfig.class,
         PharmacyAutoConfig.class,
-        PrematureAutoConfig.class
+        PrematureAutoConfig.class,
+        EmergencyAutoConfig.class
 })
 public class HmsApplication {
 
