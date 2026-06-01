@@ -103,4 +103,26 @@ class ArchitectureTest {
                 .whereLayer("infrastructure").mayOnlyAccessLayers("domain");
         rule.check(CLASSES);
     }
+
+    @Test
+    void layeredWithinEmergency() {
+        ArchRule rule = layeredArchitecture()
+                .consideringOnlyDependenciesInLayers()
+                .layer("domain").definedBy("..emergency.domain..")
+                .layer("application").definedBy(
+                        "..emergency.createbed..",
+                        "..emergency.updatebed..",
+                        "..emergency.listbeds..",
+                        "..emergency.listservices..",
+                        "..emergency.admitpatient..",
+                        "..emergency.extendstay..",
+                        "..emergency.finishtreatment..",
+                        "..emergency.reissuedischargepayment..",
+                        "..emergency.listcases..",
+                        "..emergency.bridge..")
+                .layer("infrastructure").definedBy("..emergency.infrastructure..")
+                .whereLayer("application").mayOnlyAccessLayers("domain", "infrastructure")
+                .whereLayer("infrastructure").mayOnlyAccessLayers("domain");
+        rule.check(CLASSES);
+    }
 }
