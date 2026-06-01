@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@RestController
+@RestController("emergencyListBedsController")
 @RequestMapping("/api/emergency/beds")
 @PreAuthorize("isAuthenticated()")
 public class ListBedsController {

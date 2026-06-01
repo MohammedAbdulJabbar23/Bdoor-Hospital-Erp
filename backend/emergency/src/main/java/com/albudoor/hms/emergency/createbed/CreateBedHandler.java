@@ -6,7 +6,7 @@ import com.albudoor.hms.emergency.infrastructure.EmergencyBedRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
+@Service("emergencyCreateBedHandler")
 public class CreateBedHandler {
 
     private final EmergencyBedRepository beds;

@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
-@Service
+@Service("emergencyUpdateBedHandler")
 public class UpdateBedHandler {
 
     private final EmergencyBedRepository beds;

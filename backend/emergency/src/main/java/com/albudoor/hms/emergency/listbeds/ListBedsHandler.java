@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@Service
+@Service("emergencyListBedsHandler")
 public class ListBedsHandler {
 
     private final EmergencyBedRepository beds;

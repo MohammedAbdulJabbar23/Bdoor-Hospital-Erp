@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-@RestController
+@RestController("emergencyUpdateBedController")
 @RequestMapping("/api/emergency/beds")
 public class UpdateBedController {
 
