@@ -9,6 +9,7 @@ import com.albudoor.hms.catalogue.domain.ServiceItem;
 import com.albudoor.hms.catalogue.infrastructure.ServiceItemRepository;
 import com.albudoor.hms.emergency.domain.EmergencyBed;
 import com.albudoor.hms.emergency.domain.EmergencyCase;
+import com.albudoor.hms.emergency.domain.EmergencyServiceCodes;
 import com.albudoor.hms.emergency.infrastructure.EmergencyBedRepository;
 import com.albudoor.hms.emergency.infrastructure.EmergencyCaseRepository;
 import com.albudoor.hms.platform.exception.DomainException;
@@ -55,7 +56,8 @@ public class AdmitPatientHandler {
         }
         ServiceItem service = catalogue.findById(cmd.serviceItemId())
                 .orElseThrow(() -> new NotFoundException("Service not found: " + cmd.serviceItemId()));
-        if (service.getCategory() != ServiceCategory.EMERGENCY || !service.isActive() || service.getForwardTo() != null) {
+        if (service.getCategory() != ServiceCategory.EMERGENCY || !service.isActive() || service.getForwardTo() != null
+                || EmergencyServiceCodes.DISCHARGE.equals(service.getCode())) {
             throw new DomainException("INVALID_EMERGENCY_SERVICE", "Not a billable emergency service: " + cmd.serviceItemId());
         }
 

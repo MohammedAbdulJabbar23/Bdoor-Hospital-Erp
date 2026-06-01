@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,9 +75,9 @@ class AdmitFlowIT extends IntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private String anEmergencyServiceId() {
+    private Map<String, Object> anEmergencyService() {
         List<Map<String, Object>> services = get("/api/emergency/services", "emergency", List.class);
-        return (String) services.get(0).get("id");
+        return services.get(0);
     }
 
     private String freshBedId() {
@@ -88,7 +89,9 @@ class AdmitFlowIT extends IntegrationTest {
     void admit_then_approve_initial_marks_under_treatment_and_occupies_bed() {
         String visitId = seedEmergencyVisit();
         String bedId = freshBedId();
-        String serviceItemId = anEmergencyServiceId();
+        Map<String, Object> service = anEmergencyService();
+        String serviceItemId = (String) service.get("id");
+        BigDecimal serviceFee = new BigDecimal(String.valueOf(service.get("fee")));
 
         Map<?, ?> theCase = post("/api/emergency/cases",
                 Map.of("visitId", visitId, "bedId", bedId, "serviceItemId", serviceItemId,
@@ -101,6 +104,9 @@ class AdmitFlowIT extends IntegrationTest {
 
         var pending = payments.findAllByVisitIdOrderByCreatedAtDesc(UUID.fromString(visitId)).stream()
                 .filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst().orElseThrow();
+        assertThat(pending.getTotalDue())
+                .as("INITIAL payment should bill the selected service fee (%s)", serviceFee)
+                .isEqualByComparingTo(serviceFee);
         post("/api/payments/" + pending.getId() + "/approve", Map.of("paymentMethod", "CASH"), "cashier", Map.class);
 
         await().atMost(ofSeconds(5)).untilAsserted(() -> {
@@ -114,7 +120,7 @@ class AdmitFlowIT extends IntegrationTest {
     void admit_then_reject_initial_releases_bed_and_cancels() {
         String visitId = seedEmergencyVisit();
         String bedId = freshBedId();
-        String serviceItemId = anEmergencyServiceId();
+        String serviceItemId = (String) anEmergencyService().get("id");
 
         Map<?, ?> theCase = post("/api/emergency/cases",
                 Map.of("visitId", visitId, "bedId", bedId, "serviceItemId", serviceItemId,

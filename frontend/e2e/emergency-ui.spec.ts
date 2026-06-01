@@ -32,8 +32,10 @@ test('emergency staff can admit an incoming patient to a bed via the workspace U
   await page.getByText(patient.mrn).locator('xpath=ancestor::li').getByRole('button').click();
   await expect(page.getByTestId('admit-dialog')).toBeVisible();
 
-  // Select the first non-empty service option.
+  // Select the first non-empty service option. Wait until the select has loaded real
+  // options (more than the single placeholder) before picking, so we don't race the fetch.
   const serviceSelect = page.getByTestId('admit-service-select');
+  await expect(serviceSelect.locator('option')).not.toHaveCount(1, { timeout: 10_000 });
   await serviceSelect.selectOption({ index: 1 });
 
   // Set stay duration (bed select already defaults to first available bed).

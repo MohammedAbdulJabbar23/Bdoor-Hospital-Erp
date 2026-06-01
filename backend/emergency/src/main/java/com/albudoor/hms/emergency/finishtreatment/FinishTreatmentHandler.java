@@ -8,6 +8,7 @@ import com.albudoor.hms.catalogue.domain.ServiceCategory;
 import com.albudoor.hms.catalogue.domain.ServiceItem;
 import com.albudoor.hms.catalogue.infrastructure.ServiceItemRepository;
 import com.albudoor.hms.emergency.domain.EmergencyCase;
+import com.albudoor.hms.emergency.domain.EmergencyServiceCodes;
 import com.albudoor.hms.emergency.infrastructure.EmergencyCaseRepository;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
@@ -24,7 +25,7 @@ import java.util.UUID;
 @Service("emergencyFinishTreatmentHandler")
 public class FinishTreatmentHandler {
 
-    static final String DISCHARGE_ITEM_CODE = "EM-DISCHARGE";
+    static final String DISCHARGE_ITEM_CODE = EmergencyServiceCodes.DISCHARGE;
 
     private final EmergencyCaseRepository cases;
     private final VisitRepository visits;

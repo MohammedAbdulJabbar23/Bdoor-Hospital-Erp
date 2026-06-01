@@ -24,12 +24,16 @@ async function freshBed(api: import('@playwright/test').APIRequestContext): Prom
   return (await res.json()).id;
 }
 
-async function serviceId(api: import('@playwright/test').APIRequestContext): Promise<string> {
+async function firstService(api: import('@playwright/test').APIRequestContext): Promise<any> {
   const res = await api.get(`${API_BASE}/emergency/services`);
   if (!res.ok()) throw new Error(`list services failed: ${res.status()} ${await res.text()}`);
   const services = await res.json();
   if (!services.length) throw new Error('No emergency services found');
-  return services[0].id;
+  return services[0];
+}
+
+async function serviceId(api: import('@playwright/test').APIRequestContext): Promise<string> {
+  return (await firstService(api)).id;
 }
 
 async function pendingPayment(api: import('@playwright/test').APIRequestContext, visitId: string, stage: string) {
@@ -59,7 +63,9 @@ test.describe('REC-004 Emergency admission spine', () => {
 
     const { visit } = await startEmergencyVisit(admin);
     const bedId = await freshBed(emergency);
-    const svcId = await serviceId(emergency);
+    const service = await firstService(emergency);
+    const svcId = service.id;
+    const svcFee = Number(service.fee);
 
     // Assert initial pending payment exists before admission
     const ar = await emergency.post(`${API_BASE}/emergency/cases`, {
@@ -69,9 +75,11 @@ test.describe('REC-004 Emergency admission spine', () => {
     const emergCase = await ar.json();
     expect(emergCase.status).toBe('AWAITING_INITIAL_PAYMENT');
 
-    // Verify INITIAL pending payment exists for this visit before approval.
+    // Verify INITIAL pending payment exists for this visit before approval, and that it
+    // bills exactly the selected service's fee.
     const pay = await pendingPayment(cashier, visit.id, 'INITIAL');
     expect(pay).toBeDefined();
+    expect(Math.abs(Number(pay.totalDue) - svcFee)).toBeLessThan(0.01);
 
     // Approve initial payment.
     expect(

@@ -3,6 +3,7 @@ package com.albudoor.hms.emergency.listservices;
 import com.albudoor.hms.catalogue.domain.ServiceCategory;
 import com.albudoor.hms.catalogue.infrastructure.ServiceItemRepository;
 import com.albudoor.hms.emergency.api.EmergencyServiceResponse;
+import com.albudoor.hms.emergency.domain.EmergencyServiceCodes;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ public class ListServicesHandler {
     public List<EmergencyServiceResponse> list() {
         return catalogue.findAllByCategoryAndActiveOrderBySortOrderAscNameEnAsc(ServiceCategory.EMERGENCY, true)
                 .stream().filter(s -> s.getForwardTo() == null)
+                .filter(s -> !EmergencyServiceCodes.DISCHARGE.equals(s.getCode()))
                 .map(EmergencyServiceResponse::from).toList();
     }
 }
