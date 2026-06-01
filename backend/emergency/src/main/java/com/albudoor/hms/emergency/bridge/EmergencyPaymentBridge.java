@@ -21,8 +21,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * INITIAL approved -> case UNDER_TREATMENT, bed OCCUPIED.
  * INITIAL rejected -> bed released, case CANCELLED, visit cancelled.
- *
- * FINAL approve/reject handling is added in Phase 7.
+ * FINAL approved -> case CLOSED, bed discharged.
+ * FINAL rejected -> intentional no-op: case stays AWAITING_DISCHARGE_PAYMENT so the
+ *                   case stays open and a fresh discharge payment can be re-issued (P12b).
  */
 @Component("emergencyPaymentBridge")
 public class EmergencyPaymentBridge {
@@ -55,6 +56,18 @@ public class EmergencyPaymentBridge {
                         ec.getId(), ec.getBedCode(), event.paymentId());
             });
         }
+        if (event.stage() == PaymentStage.FINAL) {
+            cases.findByFinalPaymentId(event.paymentId()).ifPresent(ec -> {
+                ec.close();
+                cases.save(ec);
+                beds.findById(ec.getBedId()).ifPresent(bed -> {
+                    bed.discharge();
+                    beds.save(bed);
+                });
+                log.info("Emergency case {} CLOSED, bed {} discharged (final payment {})",
+                        ec.getId(), ec.getBedCode(), event.paymentId());
+            });
+        }
     }
 
     @TransactionalEventListener
@@ -77,5 +90,9 @@ public class EmergencyPaymentBridge {
                         ec.getId(), ec.getBedCode(), event.paymentId());
             });
         }
+        // FINAL rejection (P12b): the generic PaymentVisitBridge is guarded to skip EMERGENCY
+        // visits, so the visit stays AWAITING_FINAL_PAYMENT and the case stays
+        // AWAITING_DISCHARGE_PAYMENT — the case remains open and a fresh FINAL payment can be
+        // issued via the reissue-discharge-payment endpoint. No state change here by design.
     }
 }

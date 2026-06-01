@@ -94,7 +94,8 @@ public class PaymentVisitBridge {
         // Premature discharge follows BRD P12b: a rejected final payment leaves the case OPEN
         // and re-issuable, rather than moving to OUTSTANDING_BALANCE. The premature bridge owns
         // this; do not transition premature visits here.
-        if (visit.getVisitType() == com.albudoor.hms.visitmanagement.domain.VisitType.PREMATURE) return;
+        if (visit.getVisitType() == com.albudoor.hms.visitmanagement.domain.VisitType.PREMATURE
+                || visit.getVisitType() == com.albudoor.hms.visitmanagement.domain.VisitType.EMERGENCY) return;
         if (visit.getStatus() != VisitStatus.AWAITING_FINAL_PAYMENT) return;
         try {
             visit.transitionTo(VisitStatus.OUTSTANDING_BALANCE);
