@@ -74,6 +74,12 @@ public class PrematureAdmission extends AggregateRoot {
     @Column(name = "final_payment_id")
     private UUID finalPaymentId;
 
+    @Column(name = "discharge_note")
+    private String dischargeNote;
+
+    @Column(name = "finish_override_reason")
+    private String finishOverrideReason;
+
     public static PrematureAdmission open(
             UUID visitId, String visitDisplayId,
             UUID patientId, String patientMrn, String patientName,
@@ -154,6 +160,18 @@ public class PrematureAdmission extends AggregateRoot {
         require(AdmissionStatus.AWAITING_DISCHARGE_PAYMENT, "close");
         this.status = AdmissionStatus.CLOSED;
         this.closedAt = Instant.now();
+    }
+
+    public void setDischargeNote(String note) {
+        this.dischargeNote = note;
+    }
+
+    public void recordFinishOverride(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new DomainException("OVERRIDE_REASON_REQUIRED",
+                    "An override reason is required to finish with results pending");
+        }
+        this.finishOverrideReason = reason;
     }
 
     private void require(AdmissionStatus expected, String action) {
