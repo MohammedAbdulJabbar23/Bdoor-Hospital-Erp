@@ -182,4 +182,32 @@ class ClinicalExamDefectsIT extends IntegrationTest {
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(res.getBody().get("code")).isEqualTo("VISIT_NOT_IN_PROGRESS");
     }
+
+    // ---- Fix #2: vitals range validation ----
+
+    @Test
+    void upsert_rejectsOutOfRangeVitals_with400() {
+        String visitId = inProgressDoctorVisit();
+        Map<String, Object> body = examBody(visitId);
+        Map<String, Object> vitals = new HashMap<>();
+        vitals.put("systolicBp", 999);   // far above the 300 ceiling
+        vitals.put("heartRate", 70);
+        body.put("vitals", vitals);
+
+        ResponseEntity<Map> res = putRaw("/api/exams", body, "doctor");
+        // Bean-validation failure → 400 (not a DB-overflow 409).
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void upsert_acceptsNormalVitals_120_80_36_8() {
+        String visitId = inProgressDoctorVisit();
+        // examBody() already uses BP 120/80, HR 72, temp 36.8 — must remain valid.
+        Map<?, ?> exam = put("/api/exams", examBody(visitId), "doctor", Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> v = (Map<String, Object>) exam.get("vitals");
+        assertThat(v.get("systolicBp")).isEqualTo(120);
+        assertThat(v.get("diastolicBp")).isEqualTo(80);
+        assertThat(v.get("heartRate")).isEqualTo(72);
+    }
 }
