@@ -24,6 +24,32 @@ export async function createDoctor(body: CreateDoctorBody): Promise<Doctor> {
   return res.data;
 }
 
+export type UpdateDoctorBody = {
+  fullName?: string;
+  specialty?: string;
+  consultationFee?: number;
+  currency?: string;
+  phone?: string;
+};
+
+/** PUT /api/doctors/{id} — update profile fields (ADMIN). */
+export async function updateDoctor(id: string, body: UpdateDoctorBody): Promise<Doctor> {
+  const res = await api.put(`/doctors/${id}`, body);
+  return res.data;
+}
+
+/** POST /api/doctors/{id}/activate (ADMIN). */
+export async function activateDoctor(id: string): Promise<Doctor> {
+  const res = await api.post(`/doctors/${id}/activate`);
+  return res.data;
+}
+
+/** POST /api/doctors/{id}/deactivate — hides the doctor from booking, keeps history (ADMIN). */
+export async function deactivateDoctor(id: string): Promise<Doctor> {
+  const res = await api.post(`/doctors/${id}/deactivate`);
+  return res.data;
+}
+
 export async function setSchedule(doctorId: string, blocks: ScheduleBlock[]): Promise<Doctor> {
   // Backend expects HH:mm:ss; pad if needed
   const normalised = blocks.map((b) => ({

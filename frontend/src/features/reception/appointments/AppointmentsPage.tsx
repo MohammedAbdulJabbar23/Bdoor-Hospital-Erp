@@ -163,7 +163,7 @@ export function AppointmentsPage() {
               <h3 className="text-sm font-semibold text-ink-900">{t('appointments.date')}</h3>
             </div>
             <div className="space-y-2 p-4">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input type="date" min={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} />
               <p className="text-xs text-ink-500">{dt.format(new Date(date))}</p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setDate(todayIso())}>{t('common.today')}</Button>

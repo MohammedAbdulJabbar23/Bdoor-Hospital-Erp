@@ -43,15 +43,12 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   PHARMACY: Pill,
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  DOCTOR_APPOINTMENT: 'Doctor',
-  LABORATORY: 'Lab',
-  RADIOLOGY: 'Radiology',
-  ECO: 'ECO',
-  EMERGENCY: 'Emergency',
-  PREMATURE: 'Premature',
-  PHARMACY: 'Pharmacy',
-};
+/** Localised visit-type label; falls back to the raw type when no key exists. */
+function typeLabel(t: TFunction, type: string): string {
+  const key = `patientProfile.typeLabel.${type}`;
+  const label = t(key);
+  return label === key ? type : label;
+}
 
 async function getPatient(id: string): Promise<PatientResponse> {
   const res = await api.get(`/patients/${id}`);
@@ -74,33 +71,33 @@ export function PatientProfilePage() {
   const vipMut = useMutation({
     mutationFn: (vip: boolean) => toggleVip(id!, vip),
     onSuccess: async (saved) => {
-      toast.success(saved.vip ? 'Marked as VIP — payments now auto-approved' : 'VIP flag removed');
+      toast.success(saved.vip ? t('patientProfile.vipMarked') : t('patientProfile.vipRemoved'));
       await queryClient.invalidateQueries({ queryKey: ['patient', id] });
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Failed to update VIP flag'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('patientProfile.vipFailed')),
   });
 
   const startVisitMut = useMutation({
     mutationFn: (visitType: VisitType) => createVisit(id!, visitType),
     onSuccess: async (visit) => {
-      toast.success(`Visit ${visit.visitDisplayId} started`);
+      toast.success(t('patientProfile.visitStarted', { id: visit.visitDisplayId }));
       await queryClient.invalidateQueries({ queryKey: ['clinical-history', id] });
       if (visit.visitType === 'PREMATURE') navigate('/departments/premature');
       else if (visit.visitType === 'EMERGENCY') navigate('/departments/emergency');
       else navigate('/reception/queue');
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Could not start visit'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('patientProfile.visitStartFailed')),
   });
 
   const archiveMut = useMutation({
     mutationFn: () => patient!.archived ? unarchivePatient(id!) : archivePatient(id!),
     onSuccess: async (saved) => {
-      toast.success(saved.archived ? 'Patient archived' : 'Patient un-archived');
+      toast.success(saved.archived ? t('patientProfile.patientArchived') : t('patientProfile.patientUnarchived'));
       await queryClient.invalidateQueries({ queryKey: ['patient', id] });
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Archive failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('patientProfile.archiveFailed')),
   });
 
   const [startVisitOpen, setStartVisitOpen] = useState(false);
@@ -211,7 +208,7 @@ export function PatientProfilePage() {
                   onClick={() => { setStartVisitOpen(false); startVisitMut.mutate(vt); }}
                 >
                   <Icon size={14} className="me-1.5" />
-                  {TYPE_LABEL[vt]}
+                  {typeLabel(t, vt)}
                 </Button>
               );
             })}
@@ -372,7 +369,7 @@ function VisitsTimelineCard({
                 filter === f ? 'bg-brand-600 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-50'
               )}
             >
-              {f === 'ALL' ? t('common.all') : TYPE_LABEL[f]}
+              {f === 'ALL' ? t('common.all') : typeLabel(t, f)}
             </button>
           ))}
           {(query || filter !== 'ALL') && (
@@ -439,7 +436,7 @@ function TimelineRow({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm">
               <Icon size={14} className="text-ink-500" />
-              <span className="font-medium text-ink-900">{TYPE_LABEL[entry.visitType] ?? entry.visitType}</span>
+              <span className="font-medium text-ink-900">{typeLabel(t, entry.visitType)}</span>
               {entry.parentVisitId && (
                 <Badge tone="warning">{t('patientProfile.forwarded')}</Badge>
               )}
@@ -778,7 +775,7 @@ function ActiveOrdersCard({ orders, dt }: { orders: HistoryEntry[]; dt: Intl.Dat
                 <Icon size={12} className="mt-1 text-ink-500" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-ink-900">{TYPE_LABEL[o.visitType] ?? o.visitType}</span>
+                    <span className="font-medium text-ink-900">{typeLabel(t, o.visitType)}</span>
                     <Badge tone={statusTone(o.status)} dot>{o.status.replace(/_/g, ' ')}</Badge>
                   </div>
                   <div className="font-mono text-[11px] text-ink-500">{o.visitDisplayId} · started {dt.format(new Date(o.startedAt))}</div>
@@ -855,7 +852,7 @@ function RecentResultsCard({ results, dt }: { results: ReturnType<typeof deriveR
             <li key={r.visitDisplayId} className="px-5 py-3">
               <div className="flex items-center gap-2 text-sm">
                 <Icon size={12} className="text-ink-500" />
-                <span className="font-medium text-ink-900">{TYPE_LABEL[r.visitType] ?? r.visitType}</span>
+                <span className="font-medium text-ink-900">{typeLabel(t, r.visitType)}</span>
                 <span className="font-mono text-[10px] text-ink-500">{r.visitDisplayId}</span>
                 {r.endedAt && <span className="ms-auto text-[11px] text-ink-500">{dt.format(new Date(r.endedAt))}</span>}
               </div>
