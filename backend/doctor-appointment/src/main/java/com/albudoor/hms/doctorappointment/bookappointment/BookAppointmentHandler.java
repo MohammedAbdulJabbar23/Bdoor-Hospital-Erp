@@ -78,11 +78,20 @@ public class BookAppointmentHandler {
                         "scheduledFor is required for BOOKED appointments");
             }
             scheduledFor = cmd.scheduledFor();
+            if (scheduledFor.isBefore(LocalDateTime.now())) {
+                throw new DomainException("SCHEDULED_IN_PAST",
+                        "Cannot book an appointment in the past: " + scheduledFor);
+            }
             durationMinutes = resolveSlotDuration(doctor, scheduledFor)
                     .orElseThrow(() -> new DomainException("SLOT_NOT_AVAILABLE",
                             "No slot at " + scheduledFor + " for this doctor"));
-            if (appointments.existsByDoctorIdAndScheduledForAndStatusNot(
-                    doctor.getId(), scheduledFor, AppointmentStatus.CANCELLED)) {
+            // Conflict guard mirrors the slots view: CANCELLED and NO_SHOW free the slot,
+            // so a slot the slots view reports free can always be re-booked.
+            if (appointments.findActiveByDoctorAndDate(
+                            doctor.getId(), scheduledFor.toLocalDate(), AppointmentStatus.CANCELLED)
+                    .stream()
+                    .filter(a -> a.getStatus() != AppointmentStatus.NO_SHOW)
+                    .anyMatch(a -> a.getScheduledFor().equals(scheduledFor))) {
                 throw new ConflictException("SLOT_TAKEN",
                         "Slot already booked at " + scheduledFor);
             }
@@ -147,11 +156,22 @@ public class BookAppointmentHandler {
                 .filter(w -> w.getDayOfWeek() == scheduledFor.getDayOfWeek())
                 .filter(w -> isInside(w.getStartTime(), w.getEndTime(),
                         scheduledFor.toLocalTime(), Duration.ofMinutes(w.getSlotMinutes())))
+                .filter(w -> isOnGrid(w.getStartTime(), scheduledFor.toLocalTime(), w.getSlotMinutes()))
                 .map(w -> w.getSlotMinutes())
                 .findFirst();
     }
 
     private static boolean isInside(LocalTime blockStart, LocalTime blockEnd, LocalTime t, Duration slot) {
         return !t.isBefore(blockStart) && !t.plus(slot).isAfter(blockEnd);
+    }
+
+    /**
+     * A booked start must land exactly on the slot grid: the offset from the block start
+     * must be a whole multiple of {@code slotMinutes}. This prevents misaligned bookings
+     * (e.g. 10:07 then 10:15) whose slots would overlap.
+     */
+    private static boolean isOnGrid(LocalTime blockStart, LocalTime t, int slotMinutes) {
+        long offset = Duration.between(blockStart, t).toMinutes();
+        return offset >= 0 && offset % slotMinutes == 0;
     }
 }

@@ -46,6 +46,7 @@ public class SlotComputationService {
                 .map(Appointment::getScheduledFor)
                 .collect(Collectors.toSet());
 
+        LocalDateTime now = LocalDateTime.now();
         List<AppointmentSlot> slots = new ArrayList<>();
         for (WeeklyHour wh : doctor.getWeeklyHours()) {
             if (wh.getDayOfWeek() != date.getDayOfWeek()) continue;
@@ -54,7 +55,9 @@ public class SlotComputationService {
             int slotMin = wh.getSlotMinutes();
             while (cursor.plusMinutes(slotMin).compareTo(wh.getEndTime()) <= 0) {
                 LocalDateTime start = LocalDateTime.of(date, cursor);
-                boolean available = !takenStarts.contains(start);
+                // A slot is bookable only if no live appointment holds it AND it has not
+                // already elapsed (a slot whose start is in the past can never be booked).
+                boolean available = !takenStarts.contains(start) && !start.isBefore(now);
                 slots.add(new AppointmentSlot(start, slotMin, available));
                 cursor = cursor.plusMinutes(slotMin);
             }

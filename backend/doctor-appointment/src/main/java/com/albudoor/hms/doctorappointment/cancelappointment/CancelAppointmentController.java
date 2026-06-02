@@ -3,6 +3,7 @@ package com.albudoor.hms.doctorappointment.cancelappointment;
 import com.albudoor.hms.doctorappointment.api.AppointmentResponse;
 import com.albudoor.hms.doctorappointment.domain.Appointment;
 import com.albudoor.hms.doctorappointment.infrastructure.AppointmentRepository;
+import com.albudoor.hms.platform.exception.ConflictException;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.visitmanagement.domain.Visit;
 import com.albudoor.hms.visitmanagement.domain.VisitStatus;
@@ -46,17 +47,36 @@ public class CancelAppointmentController {
     public AppointmentResponse cancel(@PathVariable UUID id, @Valid @RequestBody CancelBody body) {
         Appointment a = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Appointment not found: " + id));
+
+        // Cancel-after-paid guard: once the consult payment is APPROVED the visit has moved
+        // past AWAITING_PAYMENT (IN_PROGRESS or beyond). Silently voiding a paid, in-progress
+        // visit would lose the payment record and the in-flight clinical work, so refuse.
+        Visit visit = visits.findById(a.getVisitId()).orElse(null);
+        if (visit != null && isPaidOrInProgress(visit.getStatus())) {
+            throw new ConflictException("APPOINTMENT_PAID_IN_PROGRESS",
+                    "Cannot cancel: the consult payment is approved and the visit is "
+                            + visit.getStatus() + ". Complete or cancel the visit instead.");
+        }
+
         a.cancel(body.reason());
         a.pullDomainEvents().forEach(events::publishEvent);
 
         // Per HMS comments: when an appointment is cancelled, also cancel the linked visit
         // (otherwise the cashier still sees the request).
-        Visit visit = visits.findById(a.getVisitId()).orElse(null);
         if (visit != null && !visit.getStatus().isTerminal()) {
             visit.cancel(body.reason() != null ? body.reason() : "Appointment cancelled");
             visit.pullDomainEvents().forEach(events::publishEvent);
         }
 
         return AppointmentResponse.from(a);
+    }
+
+    /** Any visit state from IN_PROGRESS onward implies the consult payment was approved. */
+    private static boolean isPaidOrInProgress(VisitStatus status) {
+        return status == VisitStatus.IN_PROGRESS
+                || status == VisitStatus.AWAITING_RESULTS
+                || status == VisitStatus.TREATMENT_FINISHED
+                || status == VisitStatus.AWAITING_FINAL_PAYMENT
+                || status == VisitStatus.OUTSTANDING_BALANCE;
     }
 }
