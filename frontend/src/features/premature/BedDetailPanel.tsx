@@ -45,7 +45,6 @@ export function BedDetailPanel({
   admission: Admission | null;
   onClose: () => void;
   onExtend: (a: { id: string; value: number; unit: StayUnit }) => void;
-  onFinish: (id: string) => void;
   onReissue: (id: string) => void;
   pending: boolean;
   t: (k: string) => string;

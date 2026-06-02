@@ -6,7 +6,7 @@ import { Siren, BedDouble, Clock, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { BedDetailPanel } from './BedDetailPanel';
 import {
-  listBeds, listCases, listIncomingEmergency, admitPatient, extendStay, finishTreatment,
+  listBeds, listCases, listIncomingEmergency, admitPatient, extendStay,
   reissueDischargePayment, listEmergencyServices,
   type Bed, type EmergencyVisit, type StayUnit, type EmergencyService,
 } from './api';
@@ -64,12 +64,6 @@ export function EmergencyWorkspacePage() {
       qc.invalidateQueries({ queryKey: ['visits'] }),
     ]);
   };
-
-  const finishMut = useMutation({
-    mutationFn: (id: string) => finishTreatment(id),
-    onSuccess: async () => { toast.success(t('emergency.toast.finished')); await invalidate(); },
-    onError: (e) => toast.error(extractApiError(e)?.message ?? t('emergency.toast.error')),
-  });
 
   const extendMut = useMutation({
     mutationFn: ({ id, value, unit }: { id: string; value: number; unit: StayUnit }) =>
@@ -158,9 +152,8 @@ export function EmergencyWorkspacePage() {
           emergencyCase={selectedCase}
           onClose={() => setSelectedCaseId(null)}
           onExtend={extendMut.mutate}
-          onFinish={finishMut.mutate}
           onReissue={reissueMut.mutate}
-          pending={extendMut.isPending || finishMut.isPending || reissueMut.isPending}
+          pending={extendMut.isPending || reissueMut.isPending}
           t={t}
           dir={i18n.dir() === 'rtl' ? 'rtl' : 'ltr'}
         />
