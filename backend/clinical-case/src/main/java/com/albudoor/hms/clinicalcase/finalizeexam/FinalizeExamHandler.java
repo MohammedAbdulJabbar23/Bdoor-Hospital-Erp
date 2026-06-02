@@ -43,18 +43,24 @@ public class FinalizeExamHandler {
         DoctorExam exam = exams.findById(examId)
                 .orElseThrow(() -> new NotFoundException("Exam not found: " + examId));
 
+        // Payment gate: the visit must be an in-progress consult (IN_PROGRESS) — or still
+        // waiting on forwarded results (AWAITING_RESULTS) — to finalize the exam. This blocks
+        // finalizing on an unpaid (CREATED/AWAITING_PAYMENT) or already-closed visit.
+        Visit visit = visits.findById(exam.getVisitId()).orElse(null);
+        if (visit != null) {
+            visit.requireExamRecordable();
+        }
+
         exam.finalize(currentUserId());
         exam.pullDomainEvents().forEach(events::publishEvent);
 
-        // Try to close the visit if it can be closed.
-        Visit visit = visits.findById(exam.getVisitId()).orElse(null);
+        // Close the visit when the consult is done and not blocked on forwarded results.
+        // IN_PROGRESS -> COMPLETED is always a valid transition, so a failure here is a real
+        // error and must surface (no longer silently swallowed). When AWAITING_RESULTS we leave
+        // the visit open; finalizing the returned results elsewhere resumes/closes it.
         if (visit != null && visit.getStatus() == VisitStatus.IN_PROGRESS) {
-            try {
-                visit.transitionTo(VisitStatus.COMPLETED);
-                visit.pullDomainEvents().forEach(events::publishEvent);
-            } catch (RuntimeException ignored) {
-                // Visit can't move to COMPLETED — leave it; doctor can finalize again later.
-            }
+            visit.transitionTo(VisitStatus.COMPLETED);
+            visit.pullDomainEvents().forEach(events::publishEvent);
         }
         return exam;
     }

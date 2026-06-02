@@ -198,6 +198,19 @@ public class Visit extends AggregateRoot {
         transitionTo(VisitStatus.CANCELLED);
     }
 
+    /**
+     * Guards the clinical-exam workflow: a doctor may only record/finalize an exam once the
+     * consultation payment is approved (visit IN_PROGRESS), or while the consult is paused on
+     * forwarded results (AWAITING_RESULTS). Recording against a CREATED/AWAITING_PAYMENT visit
+     * would bypass the cashier; recording against a closed (COMPLETED/CANCELLED) visit is invalid.
+     */
+    public void requireExamRecordable() {
+        if (this.status != VisitStatus.IN_PROGRESS && this.status != VisitStatus.AWAITING_RESULTS) {
+            throw new DomainException("VISIT_NOT_IN_PROGRESS",
+                    "Exam can only be recorded once the visit is in progress");
+        }
+    }
+
     /** Called on the parent when a forwarded sub-visit is dispatched. */
     public void markAwaitingResults() {
         transitionTo(VisitStatus.AWAITING_RESULTS);

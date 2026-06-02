@@ -47,6 +47,11 @@ public class UpsertExamHandler {
                     "Doctor exam is only valid on clinical visit types (got " + visit.getVisitType() + ")");
         }
 
+        // Payment gate: the consult must be approved (visit IN_PROGRESS) before a doctor can
+        // record findings. AWAITING_RESULTS is also allowed because a forwarded visit is still
+        // an open consult the doctor can keep documenting while results are pending.
+        visit.requireExamRecordable();
+
         DoctorExam exam = exams.findByVisitId(visit.getId()).orElse(null);
         if (exam == null) {
             UUID doctorId = visit.getAssignedDoctorId();
