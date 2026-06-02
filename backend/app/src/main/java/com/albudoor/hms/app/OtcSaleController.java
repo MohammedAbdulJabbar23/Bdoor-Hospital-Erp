@@ -51,7 +51,9 @@ public class OtcSaleController {
 
     public record OtcSaleBody(
             @NotNull UUID patientId,
-            @NotEmpty List<OtcLine> lines
+            // @Valid cascades validation into each OtcLine so the nested @Positive quantity
+            // and @NotNull drugServiceItemId actually fire (negative/zero qty + null drug).
+            @NotEmpty @Valid List<OtcLine> lines
     ) {}
 
     public record OtcSaleResponse(
