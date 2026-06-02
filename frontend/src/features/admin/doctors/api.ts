@@ -71,7 +71,16 @@ export async function removeDayOff(doctorId: string, date: string): Promise<Doct
   return res.data;
 }
 
-export async function getMyDoctorProfile(): Promise<Doctor> {
+/**
+ * GET /api/doctors/me — the Doctor profile linked to the current user.
+ *
+ * Returns `null` when the authenticated user has no linked profile (e.g. an admin
+ * or cashier viewing /my-schedule). The backend signals this with 200 + an empty
+ * body (or 204 No Content), so callers treat `null` as "no doctor profile linked"
+ * rather than as an error.
+ */
+export async function getMyDoctorProfile(): Promise<Doctor | null> {
   const res = await api.get('/doctors/me');
-  return res.data;
+  // 200 + empty body arrives as '' (axios) and 204 as undefined/null — normalise to null.
+  return res.data ? (res.data as Doctor) : null;
 }

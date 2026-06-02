@@ -117,6 +117,15 @@ public class Doctor extends AggregateRoot {
         this.daysOff.removeIf(d -> d.getDate().equals(date));
     }
 
+    /**
+     * Link this Doctor to an identity user account. Used by the dev/test seeder to
+     * repair the user link on existing demo doctors (idempotent backfill); never
+     * called from a production path.
+     */
+    public void linkUser(UUID userId) {
+        this.userId = userId;
+    }
+
     public void deactivate() {
         this.active = false;
     }

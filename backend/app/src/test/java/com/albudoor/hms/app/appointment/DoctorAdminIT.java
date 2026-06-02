@@ -1,6 +1,10 @@
 package com.albudoor.hms.app.appointment;
 
 import com.albudoor.hms.app.IntegrationTest;
+import com.albudoor.hms.doctorappointment.domain.Doctor;
+import com.albudoor.hms.doctorappointment.infrastructure.DoctorRepository;
+import com.albudoor.hms.identity.domain.User;
+import com.albudoor.hms.identity.infrastructure.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -11,8 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DoctorAdminIT extends IntegrationTest {
 
     @Autowired TestRestTemplate rest;
+    @Autowired UserRepository users;
+    @Autowired DoctorRepository doctors;
 
     private String token(String user) {
         var res = rest.postForEntity("/api/auth/login",
@@ -125,5 +133,33 @@ class DoctorAdminIT extends IntegrationTest {
         ResponseEntity<Map> res = exchange("/api/doctors/" + doctorId, HttpMethod.PUT, Map.of(
                 "fullName", "Hacker"), "receptionist", Map.class);
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void me_returns_profile_for_a_doctor_user() {
+        // Ensure the 'doctor' seed user is linked to a Doctor profile (independent of
+        // first-boot seeder ordering), then assert /me returns that profile with 200.
+        UUID doctorUserId = users.findByUsername("doctor").map(User::getId).orElseThrow();
+        if (doctors.findByUserId(doctorUserId).isEmpty()) {
+            doctors.save(Doctor.create(doctorUserId, "Dr. Kareem Al-Janabi",
+                    "General Practitioner", new BigDecimal("15000"), "IQD", "+9647701111111"));
+        }
+
+        ResponseEntity<Map> res = exchange("/api/doctors/me", HttpMethod.GET, null, "doctor", Map.class);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).as("doctor user must receive a profile body").isNotNull();
+        assertThat(res.getBody().get("id")).isNotNull();
+        assertThat(res.getBody().get("fullName")).isNotNull();
+    }
+
+    @Test
+    void me_returns_200_with_empty_body_for_a_user_without_a_doctor_profile() {
+        // A cashier is authenticated but has no linked Doctor profile: this is a valid
+        // "no profile" state, so it must be 200 with an empty body — never 404.
+        ResponseEntity<String> res = exchange("/api/doctors/me", HttpMethod.GET, null, "cashier", String.class);
+        assertThat(res.getStatusCode())
+                .as("no-profile user -> %s : %s", res.getStatusCode(), res.getBody())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).as("no-profile body must be empty/null, not an error payload").isNullOrEmpty();
     }
 }

@@ -1,10 +1,9 @@
 package com.albudoor.hms.doctorappointment.listdoctors;
 
 import com.albudoor.hms.doctorappointment.api.DoctorResponse;
-import com.albudoor.hms.doctorappointment.domain.Doctor;
 import com.albudoor.hms.doctorappointment.infrastructure.DoctorRepository;
 import com.albudoor.hms.identity.infrastructure.security.HmsUserPrincipal;
-import com.albudoor.hms.platform.exception.NotFoundException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,14 +33,21 @@ public class ListDoctorsController {
         return handler.list(activeOnly).stream().map(DoctorResponse::from).toList();
     }
 
-    /** Resolve the Doctor record linked to the currently authenticated user. */
+    /**
+     * Resolve the Doctor record linked to the currently authenticated user.
+     *
+     * <p>Returns 200 with the profile when one is linked, and 200 with an empty
+     * (null) body when the authenticated user simply has no Doctor profile
+     * (e.g. an admin or cashier viewing /my-schedule). "No profile" is a valid
+     * state for an authenticated user, not a missing resource, so it is not a 404.
+     */
     @GetMapping("/me")
-    public DoctorResponse me(@AuthenticationPrincipal HmsUserPrincipal principal) {
-        if (principal == null) throw new NotFoundException("No authenticated user");
-        Doctor doctor = repo.findByUserId(principal.userId())
-                .orElseThrow(() -> new NotFoundException(
-                        "No doctor profile linked to this user account"));
-        return DoctorResponse.from(doctor);
+    public ResponseEntity<DoctorResponse> me(@AuthenticationPrincipal HmsUserPrincipal principal) {
+        if (principal == null) return ResponseEntity.ok().build();
+        return repo.findByUserId(principal.userId())
+                .map(DoctorResponse::from)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.ok().build());
     }
 
     @GetMapping("/{id}")

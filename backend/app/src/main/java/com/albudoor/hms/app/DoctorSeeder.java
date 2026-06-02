@@ -43,11 +43,21 @@ public class DoctorSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (doctors.count() > 0) return;
-
         UUID drUserId = users.findByUsername("doctor").map(User::getId).orElse(null);
         UUID emergencyUserId = users.findByUsername("emergency").map(User::getId).orElse(null);
         UUID prematureUserId = users.findByUsername("premature").map(User::getId).orElse(null);
+
+        // Repair pass: on a clean first boot DoctorSeeder may run before DevDataSeeder has
+        // created the 'doctor'/'emergency'/'premature' users, leaving the demo doctors with a
+        // null user link (so /api/doctors/me can't resolve their profile). Backfill the link
+        // by matching on the canonical full name. Idempotent and dev/test-only (@Profile !prod):
+        // only fills a missing link, never reassigns an existing one.
+        if (doctors.count() > 0) {
+            linkByName("Dr. Kareem Al-Janabi", drUserId);
+            linkByName("Dr. Hassan Al-Obeidi", emergencyUserId);
+            linkByName("Dr. Noor Al-Rubaie", prematureUserId);
+            return;
+        }
 
         // Iraqi clinic norm: working week Sun–Thu with split morning/evening blocks.
         List<WeeklyHour> generalHours = List.of(
@@ -72,6 +82,20 @@ public class DoctorSeeder implements CommandLineRunner {
         seedDoctor(prematureUserId, "Dr. Noor Al-Rubaie", "Neonatology",       new BigDecimal("25000"), "+9647703333333", consultantHours);
 
         log.warn("DoctorSeeder: created 3 demo doctors with default schedules. Adjust in /admin/doctors before production.");
+    }
+
+    /** Backfill a missing user link on the demo doctor matching {@code fullName}. No-op if absent or already linked. */
+    private void linkByName(String fullName, UUID userId) {
+        if (userId == null) return;
+        if (doctors.findByUserId(userId).isPresent()) return; // already linked to this user
+        doctors.findAll().stream()
+                .filter(d -> d.getFullName().equalsIgnoreCase(fullName) && d.getUserId() == null)
+                .findFirst()
+                .ifPresent(d -> {
+                    d.linkUser(userId);
+                    doctors.save(d);
+                    log.info("DoctorSeeder: linked demo doctor '{}' to user {}", fullName, userId);
+                });
     }
 
     private void seedDoctor(UUID userId, String fullName, String specialty, BigDecimal fee, String phone, List<WeeklyHour> hours) {
