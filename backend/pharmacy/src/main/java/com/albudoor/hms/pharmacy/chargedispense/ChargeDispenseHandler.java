@@ -70,16 +70,29 @@ public class ChargeDispenseHandler {
         // so verify available (non-expired) stock now. Charging a patient for stock that
         // isn't there is the defect we're closing — fail fast with 422 OUT_OF_STOCK before
         // any payment is created. (mark-given keeps its own check + the actual decrement.)
+        //
+        // RESERVATION: stock isn't decremented until mark-given, so two concurrent in-flight
+        // dispenses for the same drug could each pass a bare available-stock check yet only the
+        // first could actually be handed over. We close that by treating already-in-flight
+        // dispenses (charged/awaiting-payment + ready-to-give) as "committed" and requiring
+        // available - committedByOthers >= wanted. Reject/cancel/give naturally drop a dispense
+        // out of the committed set (no explicit release needed).
         LocalDate today = LocalDate.now();
         for (DispenseLine l : dispense.getLines()) {
             if (l.getDrugServiceItemId() == null) continue;
             int wanted = Math.max(1, l.getQuantity());
             List<DrugBatch> available = batches.findAvailableForDrug(l.getDrugServiceItemId(), today);
             int total = available.stream().mapToInt(DrugBatch::getQtyRemaining).sum();
-            if (total < wanted) {
+            long committedByOthers =
+                    dispenses.committedQtyForDrugExcluding(l.getDrugServiceItemId(), dispense.getId());
+            long uncommitted = total - committedByOthers;
+            if (uncommitted < wanted) {
                 throw new DomainException("OUT_OF_STOCK",
                         "Insufficient stock for " + l.getDrugName()
-                                + " — need " + wanted + ", have " + total);
+                                + " — need " + wanted + ", have " + total
+                                + (committedByOthers > 0
+                                        ? " (" + committedByOthers + " reserved by in-flight dispenses)"
+                                        : ""));
             }
         }
 

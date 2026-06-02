@@ -29,4 +29,30 @@ public interface PharmacyDispenseRepository extends JpaRepository<PharmacyDispen
             @Param("status") DispenseStatus status,
             Pageable pageable
     );
+
+    /**
+     * Committed (reserved) quantity for a drug = sum of dispense-line quantities for that drug
+     * across dispenses currently IN-FLIGHT but not yet handed over — i.e. charged and parked in
+     * the cashier queue ({@code AWAITING_PAYMENT}) or paid and waiting at the counter
+     * ({@code READY_TO_GIVE}). These quantities have not yet decremented stock (that happens at
+     * mark-given) but are promised to a patient, so a concurrent charge must not re-promise them.
+     *
+     * <p>PENDING dispenses are excluded (not yet charged), and DISPENSED/CANCELLED are excluded
+     * (terminal — DISPENSED already drew its stock, CANCELLED naturally released). The dispense
+     * being charged is excluded by id so it does not count its own quantity against itself.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(line.quantity), 0)
+            FROM PharmacyDispense d
+            JOIN d.lines line
+            WHERE line.drugServiceItemId = :drugId
+              AND d.id <> :excludeDispenseId
+              AND d.status IN (
+                  com.albudoor.hms.pharmacy.domain.DispenseStatus.AWAITING_PAYMENT,
+                  com.albudoor.hms.pharmacy.domain.DispenseStatus.READY_TO_GIVE)
+            """)
+    long committedQtyForDrugExcluding(
+            @Param("drugId") UUID drugId,
+            @Param("excludeDispenseId") UUID excludeDispenseId
+    );
 }
