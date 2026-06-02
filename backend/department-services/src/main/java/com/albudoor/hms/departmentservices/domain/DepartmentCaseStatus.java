@@ -14,5 +14,10 @@ public enum DepartmentCaseStatus {
     /** Forwarded visit returned to originating department. */
     RETURNED,
     /** Cancelled before completion. */
-    CANCELLED
+    CANCELLED;
+
+    /** A finalized/terminal case can no longer accept clinical mutations (e.g. attachments). */
+    public boolean isTerminal() {
+        return this == CLOSED || this == RETURNED || this == CANCELLED;
+    }
 }

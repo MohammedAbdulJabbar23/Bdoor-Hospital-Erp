@@ -92,6 +92,12 @@ public class CaseAttachmentController {
         }
         DepartmentCase deptCase = cases.findById(caseId)
                 .orElseThrow(() -> new NotFoundException("Case not found: " + caseId));
+        // A finalized/terminal case (CLOSED/RETURNED/CANCELLED) must not accept new
+        // attachments — the clinical record is closed.
+        if (deptCase.getStatus().isTerminal()) {
+            throw new DomainException("CASE_FINALIZED",
+                    "Cannot upload attachments to a " + deptCase.getStatus() + " case " + caseId);
+        }
         // Service item must belong to this case
         boolean hasLine = deptCase.getServices().stream()
                 .anyMatch(l -> l.getServiceItemId().equals(serviceItemId));

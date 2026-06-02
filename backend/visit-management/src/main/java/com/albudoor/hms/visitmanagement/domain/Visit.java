@@ -13,6 +13,8 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -39,6 +41,8 @@ import java.util.UUID;
         }
 )
 public class Visit extends AggregateRoot {
+
+    private static final Logger log = LoggerFactory.getLogger(Visit.class);
 
     @Id
     private UUID id;
@@ -202,8 +206,21 @@ public class Visit extends AggregateRoot {
     /**
      * Called on the parent when a forwarded sub-visit returns. Snapshots the results summary
      * and emits a {@link VisitReturnedEvent} so the originating department's queue updates.
+     *
+     * <p>If the parent has already reached a terminal state (COMPLETED/CANCELLED) the result
+     * arrived after the parent was closed — a late lab/imaging return. We must NOT silently
+     * overwrite the closed aggregate's {@code resultsSummary} or attempt a transition (which
+     * would throw on the terminal state machine anyway). The child has already completed
+     * normally via {@code completeForwardedWith}; here we just log and skip. No notification
+     * system exists, so logging is the most we can do without mutating a closed visit.
      */
     public void receiveResultsFromChild(UUID childId, VisitType childType, String summary) {
+        if (this.status.isTerminal()) {
+            log.warn("Result returned to already-closed visit {} (status {}) from child {} ({}); "
+                            + "skipping resultsSummary overwrite and transition",
+                    this.id, this.status, childId, childType);
+            return;
+        }
         this.resultsSummary = summary;
         if (this.status == VisitStatus.AWAITING_RESULTS) {
             // Doctor "pause-and-wait" pattern: resume the parent.
