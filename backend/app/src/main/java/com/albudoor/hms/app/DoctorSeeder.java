@@ -9,6 +9,7 @@ import com.albudoor.hms.identity.infrastructure.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.UUID;
  * whose user link / name doesn't already exist.
  */
 @Component
+@Profile("!prod") // dev/test only — never seed demo doctors in production
 @Order(20) // after DevDataSeeder (default order)
 public class DoctorSeeder implements CommandLineRunner {
 

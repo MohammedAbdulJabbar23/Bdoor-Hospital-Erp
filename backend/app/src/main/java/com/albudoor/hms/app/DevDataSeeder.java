@@ -6,6 +6,7 @@ import com.albudoor.hms.identity.infrastructure.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +20,12 @@ import java.util.Set;
  *
  * Username == password for every seeded account — convenient for dev only.
  * Replace before production.
+ *
+ * <p>{@code @Profile("!prod")} keeps it active under the default (dev) and {@code test}
+ * profiles (the IT suite logs in as these users) but disables it in production.
  */
 @Component
+@Profile("!prod")
 public class DevDataSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);

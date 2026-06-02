@@ -2,7 +2,9 @@ package com.albudoor.hms.platform.web;
 
 import com.albudoor.hms.platform.exception.ConflictException;
 import com.albudoor.hms.platform.exception.DomainException;
+import com.albudoor.hms.platform.exception.InvalidCredentialsException;
 import com.albudoor.hms.platform.exception.NotFoundException;
+import com.albudoor.hms.platform.exception.TooManyAttemptsException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleDomain(DomainException ex) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(ApiError.of(422, ex.getCode(), ex.getMessage()));
+    }
+
+    /** Failed login (bad username/password or inactive account) — 401, never 422. */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiError.of(401, "INVALID_CREDENTIALS", ex.getMessage()));
+    }
+
+    /** Account temporarily locked after repeated failed logins — 429. */
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<ApiError> handleTooManyAttempts(TooManyAttemptsException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiError.of(429, "TOO_MANY_ATTEMPTS", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

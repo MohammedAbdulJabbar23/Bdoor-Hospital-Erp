@@ -1,0 +1,42 @@
+# Production profile. Activate with SPRING_PROFILES_ACTIVE=prod.
+#
+# Hardening over the default (dev) profile:
+#   - JWT secret has NO fallback — the app fails fast on startup if HMS_JWT_SECRET is unset.
+#   - Dev/demo seeders (DevDataSeeder, DoctorSeeder) are disabled via @Profile("!prod").
+#   - API docs / Swagger UI disabled; only the /health actuator endpoint is exposed.
+#   - Quieter logging (root WARN, app INFO).
+# Schema is still validated (never auto-modified) and Flyway runs migrations.
+
+spring:
+  datasource:
+    url: ${HMS_DB_URL}
+    username: ${HMS_DB_USER}
+    password: ${HMS_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+hms:
+  security:
+    jwt:
+      # No default: app refuses to start in prod if HMS_JWT_SECRET is not provided (fail-fast).
+      secret: ${HMS_JWT_SECRET}
+
+logging:
+  level:
+    root: WARN
+    com.albudoor.hms: INFO

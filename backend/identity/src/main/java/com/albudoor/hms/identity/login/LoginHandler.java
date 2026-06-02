@@ -3,7 +3,8 @@ package com.albudoor.hms.identity.login;
 import com.albudoor.hms.identity.domain.User;
 import com.albudoor.hms.identity.infrastructure.UserRepository;
 import com.albudoor.hms.identity.infrastructure.security.JwtService;
-import com.albudoor.hms.platform.exception.DomainException;
+import com.albudoor.hms.platform.exception.InvalidCredentialsException;
+import com.albudoor.hms.platform.exception.TooManyAttemptsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -13,23 +14,35 @@ public class LoginHandler {
     private final UserRepository users;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final LoginAttemptService attempts;
 
-    public LoginHandler(UserRepository users, PasswordEncoder encoder, JwtService jwt) {
+    public LoginHandler(UserRepository users, PasswordEncoder encoder, JwtService jwt,
+                        LoginAttemptService attempts) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
+        this.attempts = attempts;
     }
 
     public LoginResponse handle(LoginRequest req) {
-        User user = users.findByUsername(req.username().toLowerCase().trim())
-                .orElseThrow(() -> new DomainException("INVALID_CREDENTIALS", "Invalid username or password"));
+        String username = req.username().toLowerCase().trim();
 
-        if (!user.isActive()) {
-            throw new DomainException("USER_INACTIVE", "User account is deactivated");
+        if (attempts.isLocked(username)) {
+            throw new TooManyAttemptsException("Too many failed attempts. Try again later.");
         }
-        if (!encoder.matches(req.password(), user.getPasswordHash())) {
-            throw new DomainException("INVALID_CREDENTIALS", "Invalid username or password");
+
+        User user = users.findByUsername(username).orElse(null);
+        if (user == null || !user.isActive()
+                || !encoder.matches(req.password(), user.getPasswordHash())) {
+            attempts.recordFailure(username);
+            // Re-check so the attempt that crosses the threshold is itself rejected as locked.
+            if (attempts.isLocked(username)) {
+                throw new TooManyAttemptsException("Too many failed attempts. Try again later.");
+            }
+            throw new InvalidCredentialsException("Invalid username or password");
         }
+
+        attempts.recordSuccess(username);
 
         JwtService.Issued issued = jwt.issue(user);
         return new LoginResponse(
