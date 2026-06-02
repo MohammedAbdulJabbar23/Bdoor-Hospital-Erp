@@ -9,6 +9,7 @@ import com.albudoor.hms.catalogue.domain.ServiceItem;
 import com.albudoor.hms.catalogue.infrastructure.ServiceItemRepository;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
+import com.albudoor.hms.platform.exception.ResultsPendingException;
 import com.albudoor.hms.premature.domain.PrematureAdmission;
 import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
 import com.albudoor.hms.visitmanagement.domain.Visit;
@@ -43,11 +44,25 @@ public class FinishTreatmentHandler {
     }
 
     @Transactional
-    public PrematureAdmission handle(UUID admissionId) {
+    public PrematureAdmission handle(UUID admissionId, FinishTreatmentCommand cmd) {
         PrematureAdmission admission = admissions.findById(admissionId)
                 .orElseThrow(() -> new NotFoundException("Admission not found: " + admissionId));
 
-        // NOTE: the "block finish if lab/radiology results pending" gate is sub-project C.
+        // Results-pending gate (warn + override): open = child visit not COMPLETED/CANCELLED.
+        List<Visit> children = visits.findAllByParentVisitIdOrderByStartedAtDesc(admission.getVisitId());
+        List<Visit> open = children.stream()
+                .filter(v -> v.getStatus() != VisitStatus.COMPLETED && v.getStatus() != VisitStatus.CANCELLED)
+                .toList();
+        if (!open.isEmpty()) {
+            if (!cmd.override()) {
+                String list = open.stream()
+                        .map(v -> v.getVisitDisplayId() + " (" + v.getVisitType() + ", " + v.getStatus() + ")")
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new ResultsPendingException("Results still pending: " + list);
+            }
+            admission.recordFinishOverride(cmd.overrideReason()); // throws if reason blank
+        }
+
         admission.finishTreatment(); // UNDER_CARE -> TREATMENT_FINISHED
         admissions.save(admission);
 
