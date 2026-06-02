@@ -204,12 +204,12 @@ public class Visit extends AggregateRoot {
      * and emits a {@link VisitReturnedEvent} so the originating department's queue updates.
      */
     public void receiveResultsFromChild(UUID childId, VisitType childType, String summary) {
-        if (this.status != VisitStatus.AWAITING_RESULTS) {
-            throw new DomainException("NOT_AWAITING_RESULTS",
-                    "Parent visit is not awaiting results (status=" + this.status + ")");
-        }
         this.resultsSummary = summary;
-        transitionTo(VisitStatus.IN_PROGRESS);
+        if (this.status == VisitStatus.AWAITING_RESULTS) {
+            // Doctor "pause-and-wait" pattern: resume the parent.
+            transitionTo(VisitStatus.IN_PROGRESS);
+        }
+        // Bed-stay pattern: parent was never paused (stays IN_PROGRESS); just record + notify.
         registerEvent(VisitReturnedEvent.of(this.id, childId, childType, summary));
     }
 

@@ -35,6 +35,15 @@ public class ForwardVisitHandler {
      */
     @Transactional
     public ForwardResult handle(UUID parentVisitId, ForwardVisitCommand cmd) {
+        return handle(parentVisitId, cmd, true);
+    }
+
+    /**
+     * @param pauseParent true for the doctor "pause-and-wait" flow (parent → AWAITING_RESULTS);
+     *                    false for bed-stay orders (parent stays IN_PROGRESS, concurrent orders allowed).
+     */
+    @Transactional
+    public ForwardResult handle(UUID parentVisitId, ForwardVisitCommand cmd, boolean pauseParent) {
         Visit parent = visits.findById(parentVisitId)
                 .orElseThrow(() -> new NotFoundException("Visit not found: " + parentVisitId));
 
@@ -53,7 +62,9 @@ public class ForwardVisitHandler {
                 parent.getVisitType()
         );
         visits.save(child);
-        parent.markAwaitingResults();
+        if (pauseParent) {
+            parent.markAwaitingResults();
+        }
 
         // Drain events from both aggregates first, then publish in order so handlers see
         // the parent's status change before reacting to the forward.
