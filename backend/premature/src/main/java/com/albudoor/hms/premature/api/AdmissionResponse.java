@@ -12,7 +12,8 @@ public record AdmissionResponse(
         int stayValue, String stayUnit,
         Instant admittedAt, Instant stayExpiresAt,
         Instant treatmentFinishedAt, Instant closedAt,
-        UUID initialPaymentId, UUID finalPaymentId
+        UUID initialPaymentId, UUID finalPaymentId,
+        String dischargeNote, String finishOverrideReason
 ) {
     public static AdmissionResponse from(PrematureAdmission a) {
         return new AdmissionResponse(
@@ -22,6 +23,7 @@ public record AdmissionResponse(
                 a.getStayValue(), a.getStayUnit().name(),
                 a.getAdmittedAt(), a.getStayExpiresAt(),
                 a.getTreatmentFinishedAt(), a.getClosedAt(),
-                a.getInitialPaymentId(), a.getFinalPaymentId());
+                a.getInitialPaymentId(), a.getFinalPaymentId(),
+                a.getDischargeNote(), a.getFinishOverrideReason());
     }
 }
