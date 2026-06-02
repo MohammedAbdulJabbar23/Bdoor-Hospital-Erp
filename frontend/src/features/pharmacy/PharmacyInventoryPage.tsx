@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Plus, AlertTriangle, ShoppingCart, X, Package, Search } from 'lucide-react';
@@ -21,6 +22,7 @@ import { cn } from '@/shared/ui/cn';
 type Tab = 'stock' | 'expiring' | 'batches';
 
 export function PharmacyInventoryPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('stock');
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [otcOpen, setOtcOpen] = useState(false);
@@ -28,24 +30,24 @@ export function PharmacyInventoryPage() {
   return (
     <>
       <PageHeader
-        title="Pharmacy inventory"
-        description="Stock by drug, batches with expiry tracking, and walk-in OTC sales."
+        title={t('pharmacy.inventoryTitle')}
+        description={t('pharmacy.inventoryDescription')}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={() => setReceiveOpen(true)}>
-              <Plus size={14} className="me-1.5" /> Receive stock
+              <Plus size={14} className="me-1.5" /> {t('pharmacy.receiveStock')}
             </Button>
             <Button onClick={() => setOtcOpen(true)}>
-              <ShoppingCart size={14} className="me-1.5" /> Walk-in sale
+              <ShoppingCart size={14} className="me-1.5" /> {t('pharmacy.walkinSale')}
             </Button>
           </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <TabBtn active={tab === 'stock'} onClick={() => setTab('stock')}>By drug</TabBtn>
-        <TabBtn active={tab === 'expiring'} onClick={() => setTab('expiring')}>Expiring soon</TabBtn>
-        <TabBtn active={tab === 'batches'} onClick={() => setTab('batches')}>All batches</TabBtn>
+        <TabBtn active={tab === 'stock'} onClick={() => setTab('stock')}>{t('pharmacy.tabByDrug')}</TabBtn>
+        <TabBtn active={tab === 'expiring'} onClick={() => setTab('expiring')}>{t('pharmacy.tabExpiring')}</TabBtn>
+        <TabBtn active={tab === 'batches'} onClick={() => setTab('batches')}>{t('pharmacy.tabAllBatches')}</TabBtn>
       </div>
 
       {tab === 'stock' && <StockByDrugTab />}
@@ -74,21 +76,22 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 
 function StockByDrugTab() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({ queryKey: ['inv-stock'], queryFn: listStock });
   if (isLoading) return <Skeleton className="h-64" />;
   if (!data || data.length === 0) {
-    return <EmptyState icon={Package} title="No stock yet" description="Receive your first batch to get started." />;
+    return <EmptyState icon={Package} title={t('pharmacy.noStock')} description={t('pharmacy.noStockHint')} />;
   }
   return (
     <Card>
       <table className="w-full text-sm">
         <thead className="border-b border-ink-100 bg-ink-50/40 text-[11px] uppercase tracking-wide text-ink-500">
           <tr>
-            <th className="px-4 py-3 text-start">Drug</th>
-            <th className="px-4 py-3 text-start">Code</th>
-            <th className="px-4 py-3 text-end">Total in stock</th>
-            <th className="px-4 py-3 text-start">Earliest expiry</th>
-            <th className="px-4 py-3 text-end">Batches</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colDrug')}</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colCode')}</th>
+            <th className="px-4 py-3 text-end">{t('pharmacy.colTotalInStock')}</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colEarliestExpiry')}</th>
+            <th className="px-4 py-3 text-end">{t('pharmacy.colBatches')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-100">
@@ -110,6 +113,7 @@ function StockByDrugTab() {
 }
 
 function ExpiringTab() {
+  const { t } = useTranslation();
   const [days, setDays] = useState(60);
   const { data, isLoading } = useQuery({
     queryKey: ['inv-expiring', days],
@@ -118,18 +122,18 @@ function ExpiringTab() {
   return (
     <>
       <div className="mb-3 flex items-center gap-2 text-sm">
-        <span className="text-ink-500">Show batches expiring within</span>
+        <span className="text-ink-500">{t('pharmacy.showExpiringWithin')}</span>
         <input
           type="number" min={7} max={365} value={days}
           onChange={(e) => setDays(Number(e.target.value) || 60)}
           className="h-8 w-20 rounded-md border border-ink-200 bg-white px-2 text-sm focus:border-brand-500"
         />
-        <span className="text-ink-500">days</span>
+        <span className="text-ink-500">{t('pharmacy.days')}</span>
       </div>
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : !data || data.length === 0 ? (
-        <EmptyState icon={AlertTriangle} title="No expiring batches" description={`Nothing expires within ${days} days.`} />
+        <EmptyState icon={AlertTriangle} title={t('pharmacy.noExpiring')} description={t('pharmacy.noExpiringHint', { days })} />
       ) : (
         <BatchTable batches={data} />
       )}
@@ -138,26 +142,28 @@ function ExpiringTab() {
 }
 
 function AllBatchesTab() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({ queryKey: ['inv-batches'], queryFn: () => listBatches() });
   if (isLoading) return <Skeleton className="h-64" />;
   if (!data || data.length === 0) {
-    return <EmptyState icon={Package} title="No batches yet" />;
+    return <EmptyState icon={Package} title={t('pharmacy.noBatches')} />;
   }
   return <BatchTable batches={data} />;
 }
 
 function BatchTable({ batches }: { batches: DrugBatch[] }) {
+  const { t } = useTranslation();
   return (
     <Card>
       <table className="w-full text-sm">
         <thead className="border-b border-ink-100 bg-ink-50/40 text-[11px] uppercase tracking-wide text-ink-500">
           <tr>
-            <th className="px-4 py-3 text-start">Drug</th>
-            <th className="px-4 py-3 text-start">Batch #</th>
-            <th className="px-4 py-3 text-start">Expiry</th>
-            <th className="px-4 py-3 text-end">Remaining</th>
-            <th className="px-4 py-3 text-end">Received</th>
-            <th className="px-4 py-3 text-start">Supplier</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colDrug')}</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colBatchNo')}</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colExpiry')}</th>
+            <th className="px-4 py-3 text-end">{t('pharmacy.colRemaining')}</th>
+            <th className="px-4 py-3 text-end">{t('pharmacy.colReceived')}</th>
+            <th className="px-4 py-3 text-start">{t('pharmacy.colSupplier')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-100">
@@ -184,15 +190,17 @@ function BatchTable({ batches }: { batches: DrugBatch[] }) {
 }
 
 function ExpiryBadge({ date }: { date: string }) {
+  const { t } = useTranslation();
   const today = new Date();
   const exp = new Date(date);
   const days = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const tone: 'success' | 'warning' | 'danger' = days < 0 ? 'danger' : days < 30 ? 'danger' : days < 90 ? 'warning' : 'success';
-  const label = days < 0 ? `Expired ${-days}d ago` : days < 60 ? `${days}d left` : exp.toLocaleDateString();
+  const label = days < 0 ? t('pharmacy.expiredAgo', { days: -days }) : days < 60 ? t('pharmacy.daysLeft', { days }) : exp.toLocaleDateString();
   return <Badge tone={tone}>{label}</Badge>;
 }
 
 function ReceiveBatchDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: drugs, isLoading: drugsLoading } = useQuery({
     queryKey: ['catalogue-items', 'DRUG'],
@@ -213,47 +221,47 @@ function ReceiveBatchDialog({ onClose }: { onClose: () => void }) {
       supplier: supplier || undefined,
     }),
     onSuccess: async () => {
-      toast.success(`Received ${qty} units`);
+      toast.success(t('pharmacy.receivedUnits', { qty }));
       await queryClient.invalidateQueries({ queryKey: ['inv-stock'] });
       await queryClient.invalidateQueries({ queryKey: ['inv-batches'] });
       await queryClient.invalidateQueries({ queryKey: ['inv-expiring'] });
       onClose();
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Receive failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('pharmacy.receiveFailed')),
   });
 
   return (
-    <DialogShell title="Receive new stock" onClose={onClose}>
+    <DialogShell title={t('pharmacy.receiveDialogTitle')} onClose={onClose}>
       <div className="space-y-3 p-5">
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-ink-700">Drug</span>
+          <span className="mb-1.5 block text-xs font-medium text-ink-700">{t('pharmacy.drug')}</span>
           <select
             value={drugId} onChange={(e) => setDrugId(e.target.value)}
             className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm focus:border-brand-500"
           >
-            <option value="">{drugsLoading ? 'Loading…' : 'Pick a drug'}</option>
+            <option value="">{drugsLoading ? t('pharmacy.loading') : t('pharmacy.pickADrug')}</option>
             {(drugs ?? []).map((d: ServiceItem) => (
               <option key={d.id} value={d.id}>{d.nameEn} ({d.code})</option>
             ))}
           </select>
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Batch number" value={batchNo} onChange={(e) => setBatchNo(e.target.value)} />
-          <Input label="Expiry date" type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-          <Input label="Quantity" type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-          <Input label="Unit cost (optional)" type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+          <Input label={t('pharmacy.batchNumber')} value={batchNo} onChange={(e) => setBatchNo(e.target.value)} />
+          <Input label={t('pharmacy.expiryDate')} type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+          <Input label={t('pharmacy.quantity')} type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+          <Input label={t('pharmacy.unitCost')} type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
           <div className="col-span-2">
-            <Input label="Supplier (optional)" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+            <Input label={t('pharmacy.supplier')} value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           </div>
         </div>
       </div>
       <div className="flex items-center justify-end gap-2 border-t border-ink-100 bg-ink-50/40 px-5 py-3">
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           onClick={() => mut.mutate()}
           disabled={!drugId || !batchNo || !expiryDate || !qty || mut.isPending}
         >
-          {mut.isPending ? 'Receiving…' : 'Receive stock'}
+          {mut.isPending ? t('pharmacy.receiving') : t('pharmacy.receiveStock')}
         </Button>
       </div>
     </DialogShell>
@@ -261,6 +269,7 @@ function ReceiveBatchDialog({ onClose }: { onClose: () => void }) {
 }
 
 function OtcSaleDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<PatientResponse | null>(null);
@@ -284,12 +293,12 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
   const mut = useMutation({
     mutationFn: () => createOtcSale(picked!.id, lines),
     onSuccess: async () => {
-      toast.success('OTC sale routed to cashier');
+      toast.success(t('pharmacy.otcRouted'));
       await queryClient.invalidateQueries({ queryKey: ['pharmacy-dispenses'] });
       await queryClient.invalidateQueries({ queryKey: ['inv-stock'] });
       onClose();
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'OTC sale failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('pharmacy.otcFailed')),
   });
 
   const addLine = (drugId: string) => {
@@ -307,7 +316,7 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
   const drugById = useMemo(() => new Map((drugs ?? []).map((d: ServiceItem) => [d.id, d] as const)), [drugs]);
 
   return (
-    <DialogShell title="Walk-in OTC sale" onClose={onClose}>
+    <DialogShell title={t('pharmacy.otcDialogTitle')} onClose={onClose}>
       <div className="space-y-4 p-5">
         {/* Patient picker */}
         {!picked ? (
@@ -319,7 +328,7 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search patient by name, MRN, mobile…"
+                placeholder={t('pharmacy.searchPatient')}
                 className="h-10 w-full rounded-lg border border-ink-200 bg-white ps-9 pe-3 text-sm placeholder:text-ink-400 focus:border-brand-500"
               />
             </div>
@@ -349,7 +358,7 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
               <div className="font-mono text-[11px] text-ink-500">{picked.mrn}</div>
             </div>
             <button type="button" onClick={() => setPicked(null)} className="text-xs text-ink-500 hover:underline">
-              Change
+              {t('pharmacy.change')}
             </button>
           </div>
         )}
@@ -357,7 +366,7 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
         {/* Drug picker */}
         {picked && (
           <div>
-            <div className="mb-1 text-xs font-medium text-ink-700">Drugs (catalogue)</div>
+            <div className="mb-1 text-xs font-medium text-ink-700">{t('pharmacy.drugsCatalogue')}</div>
             <select
               onChange={(e) => {
                 if (e.target.value) addLine(e.target.value);
@@ -365,7 +374,7 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
               }}
               className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm focus:border-brand-500"
             >
-              <option value="">Add a drug…</option>
+              <option value="">{t('pharmacy.addADrug')}</option>
               {(drugs ?? []).map((d: ServiceItem) => (
                 <option key={d.id} value={d.id}>{d.nameEn} ({d.code}) — {(d.fee ?? 0).toLocaleString()} {d.currency}</option>
               ))}
@@ -402,16 +411,16 @@ function OtcSaleDialog({ onClose }: { onClose: () => void }) {
       </div>
       <div className="flex items-center justify-between gap-2 border-t border-ink-100 bg-ink-50/40 px-5 py-3">
         <div className="text-sm">
-          <span className="text-ink-500">Total: </span>
+          <span className="text-ink-500">{t('pharmacy.total')}</span>
           <span className="font-mono text-base font-semibold text-ink-900">{total.toLocaleString()}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             onClick={() => mut.mutate()}
             disabled={!picked || lines.length === 0 || mut.isPending}
           >
-            {mut.isPending ? 'Routing to cashier…' : 'Send to cashier'}
+            {mut.isPending ? t('pharmacy.routingToCashier') : t('pharmacy.sendToCashier')}
           </Button>
         </div>
       </div>

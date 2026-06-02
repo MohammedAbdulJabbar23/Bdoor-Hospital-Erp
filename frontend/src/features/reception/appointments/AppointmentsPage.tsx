@@ -34,12 +34,12 @@ import {
 } from './api';
 import { cn } from '@/shared/ui/cn';
 
-const STATUS_TONE: Record<Appointment['status'], { tone: 'neutral' | 'info' | 'success' | 'warning'; label: string }> = {
-  BOOKED:     { tone: 'info',    label: 'Booked' },
-  CHECKED_IN: { tone: 'warning', label: 'Checked in' },
-  COMPLETED:  { tone: 'success', label: 'Completed' },
-  CANCELLED:  { tone: 'neutral', label: 'Cancelled' },
-  NO_SHOW:    { tone: 'neutral', label: 'No show' },
+const STATUS_TONE: Record<Appointment['status'], 'neutral' | 'info' | 'success' | 'warning'> = {
+  BOOKED:     'info',
+  CHECKED_IN: 'warning',
+  COMPLETED:  'success',
+  CANCELLED:  'neutral',
+  NO_SHOW:    'neutral',
 };
 
 function todayIso() {
@@ -271,7 +271,7 @@ export function AppointmentsPage() {
                           {a.type === 'WALKIN' ? <Badge tone="warning">Walk-in</Badge> : <Badge tone="info">Booked</Badge>}
                         </Td>
                         <Td>
-                          <Badge tone={STATUS_TONE[a.status].tone} dot>{STATUS_TONE[a.status].label}</Badge>
+                          <Badge tone={STATUS_TONE[a.status]} dot>{t(`appointmentStatus.${a.status}`)}</Badge>
                         </Td>
                         <Td>
                           <span className="font-mono text-[11px] text-ink-700">{a.visitId.slice(0, 8)}…</span>

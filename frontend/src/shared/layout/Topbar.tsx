@@ -115,7 +115,7 @@ export function Topbar() {
           <div className="absolute end-0 mt-2 w-96 rounded-xl border border-ink-200 bg-white p-3 shadow-elevated">
             <div className="mb-2 flex items-center justify-between px-1">
               <h4 className="text-sm font-semibold text-ink-900">{t('nav.notifications')}</h4>
-              <span className="text-[11px] text-ink-500">Last 24h</span>
+              <span className="text-[11px] text-ink-500">{t('nav.last24h')}</span>
             </div>
             {returnedNotifs.length === 0 ? (
               <p className="px-1 py-3 text-sm text-ink-500">{t('nav.noNotifications')}</p>
@@ -198,6 +198,7 @@ const ORIGIN_ICON: Record<string, LucideIcon> = {
 };
 
 function NotifItem({ visit, onOpen }: { visit: Visit; onOpen: () => void }) {
+  const { t } = useTranslation();
   const Icon = ORIGIN_ICON[visit.visitType] ?? FlaskConical;
   return (
     <li>
@@ -213,7 +214,7 @@ function NotifItem({ visit, onOpen }: { visit: Visit; onOpen: () => void }) {
           <div className="truncate text-sm font-medium text-ink-900">
             {visit.patientName} <span className="text-ink-500">· {visit.visitDisplayId}</span>
           </div>
-          <div className="text-xs text-ink-500">Results received from {visit.visitType.toLowerCase()}</div>
+          <div className="text-xs text-ink-500">{t('nav.resultsReceived', { dept: visit.visitType.toLowerCase() })}</div>
           {visit.resultsSummary && (
             <div className="mt-1 line-clamp-2 rounded bg-ink-50 px-2 py-1 text-[11px] text-ink-700">
               {visit.resultsSummary}

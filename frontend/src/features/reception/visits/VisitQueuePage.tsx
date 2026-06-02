@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -25,43 +26,38 @@ const TYPE_ICON: Record<VisitType, LucideIcon> = {
   PREMATURE: Baby,
   PHARMACY: Pill,
 };
-const TYPE_LABEL: Record<VisitType, string> = {
-  DOCTOR_APPOINTMENT: 'Doctor', LABORATORY: 'Lab', RADIOLOGY: 'Radiology',
-  ECO: 'ECO', EMERGENCY: 'Emergency', PREMATURE: 'Premature', PHARMACY: 'Pharmacy',
-};
-
-/** A status grouping with its visual presentation rules. */
+/** A status grouping with its visual presentation rules. Labels/descriptions resolved via i18n. */
 const STATUS_GROUPS: Array<{
   key: 'NEEDS_ACTION' | 'IN_FLIGHT' | 'CASHIER' | 'COMPLETED' | 'CLOSED';
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string | null;
   matches: VisitStatus[];
   tone: 'danger' | 'warning' | 'info' | 'success' | 'neutral';
   defaultOpen: boolean;
 }> = [
-  { key: 'NEEDS_ACTION', label: 'Needs action',     description: 'Outstanding balances and stuck visits',  matches: ['OUTSTANDING_BALANCE', 'CANCELLED'],                     tone: 'danger',  defaultOpen: true },
-  { key: 'CASHIER',      label: 'At cashier',        description: 'Awaiting payment approval',                matches: ['AWAITING_PAYMENT', 'AWAITING_FINAL_PAYMENT'],            tone: 'warning', defaultOpen: true },
-  { key: 'IN_FLIGHT',    label: 'In progress',       description: 'Patients currently being seen or studied', matches: ['IN_PROGRESS', 'AWAITING_RESULTS', 'TREATMENT_FINISHED'], tone: 'info',    defaultOpen: true },
-  { key: 'COMPLETED',    label: 'Completed today',   description: '',                                         matches: ['COMPLETED'],                                            tone: 'success', defaultOpen: false },
-  { key: 'CLOSED',       label: 'Created (waiting)', description: 'Just created, not yet routed',             matches: ['CREATED'],                                              tone: 'neutral', defaultOpen: false },
+  { key: 'NEEDS_ACTION', labelKey: 'visitQueue.group.needsAction',    descKey: 'visitQueue.group.needsActionDesc', matches: ['OUTSTANDING_BALANCE', 'CANCELLED'],                     tone: 'danger',  defaultOpen: true },
+  { key: 'CASHIER',      labelKey: 'visitQueue.group.atCashier',      descKey: 'visitQueue.group.atCashierDesc',   matches: ['AWAITING_PAYMENT', 'AWAITING_FINAL_PAYMENT'],            tone: 'warning', defaultOpen: true },
+  { key: 'IN_FLIGHT',    labelKey: 'visitQueue.group.inProgress',     descKey: 'visitQueue.group.inProgressDesc',  matches: ['IN_PROGRESS', 'AWAITING_RESULTS', 'TREATMENT_FINISHED'], tone: 'info',    defaultOpen: true },
+  { key: 'COMPLETED',    labelKey: 'visitQueue.group.completedToday', descKey: null,                               matches: ['COMPLETED'],                                            tone: 'success', defaultOpen: false },
+  { key: 'CLOSED',       labelKey: 'visitQueue.group.createdWaiting', descKey: 'visitQueue.group.createdWaitingDesc', matches: ['CREATED'],                                           tone: 'neutral', defaultOpen: false },
 ];
 
-const STATUS_TONE: Record<VisitStatus, { tone: 'neutral'|'info'|'success'|'warning'|'brand'|'danger'; label: string }> = {
-  CREATED:                { tone: 'neutral', label: 'Created' },
-  AWAITING_PAYMENT:       { tone: 'warning', label: 'Awaiting payment' },
-  IN_PROGRESS:            { tone: 'info',    label: 'In progress' },
-  AWAITING_RESULTS:       { tone: 'info',    label: 'Awaiting results' },
-  TREATMENT_FINISHED:     { tone: 'brand',   label: 'Treatment finished' },
-  AWAITING_FINAL_PAYMENT: { tone: 'warning', label: 'Awaiting final payment' },
-  COMPLETED:              { tone: 'success', label: 'Completed' },
-  CANCELLED:              { tone: 'neutral', label: 'Cancelled' },
-  OUTSTANDING_BALANCE:    { tone: 'danger',  label: 'Outstanding balance' },
+const STATUS_TONE: Record<VisitStatus, 'neutral'|'info'|'success'|'warning'|'brand'|'danger'> = {
+  CREATED:                'neutral',
+  AWAITING_PAYMENT:       'warning',
+  IN_PROGRESS:            'info',
+  AWAITING_RESULTS:       'info',
+  TREATMENT_FINISHED:     'brand',
+  AWAITING_FINAL_PAYMENT: 'warning',
+  COMPLETED:              'success',
+  CANCELLED:              'neutral',
+  OUTSTANDING_BALANCE:    'danger',
 };
 
 const VISIT_TYPES: VisitType[] = ['DOCTOR_APPOINTMENT', 'LABORATORY', 'RADIOLOGY', 'ECO', 'EMERGENCY', 'PREMATURE'];
 
 export function VisitQueuePage() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [typeFilter, setTypeFilter] = useState<VisitType | null>(null);
   const [groupFilter, setGroupFilter] = useState<typeof STATUS_GROUPS[number]['key'] | null>(null);
@@ -130,38 +126,38 @@ export function VisitQueuePage() {
   return (
     <>
       <PageHeader
-        title="Visit queue"
-        description="Live snapshot across the hospital. Refreshes every 12s. Click a row to open the matching workspace."
+        title={t('visitQueue.title')}
+        description={t('visitQueue.description')}
       />
 
       {/* ======================== KPI tiles (clickable filters) ======================== */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiTile
-          icon={ListOrdered} tone="brand" label="Total active"
+          icon={ListOrdered} tone="brand" label={t('visitQueue.kpiTotalActive')}
           value={filtered.filter((v) => v.status !== 'COMPLETED' && v.status !== 'CANCELLED').length}
           active={groupFilter === null}
           onClick={() => setGroupFilter(null)}
         />
         <KpiTile
-          icon={AlertOctagon} tone="danger" label="Needs action"
+          icon={AlertOctagon} tone="danger" label={t('visitQueue.kpiNeedsAction')}
           value={counts.NEEDS_ACTION}
           active={groupFilter === 'NEEDS_ACTION'}
           onClick={() => setGroupFilter(groupFilter === 'NEEDS_ACTION' ? null : 'NEEDS_ACTION')}
         />
         <KpiTile
-          icon={Wallet} tone="warning" label="At cashier"
+          icon={Wallet} tone="warning" label={t('visitQueue.kpiAtCashier')}
           value={counts.CASHIER}
           active={groupFilter === 'CASHIER'}
           onClick={() => setGroupFilter(groupFilter === 'CASHIER' ? null : 'CASHIER')}
         />
         <KpiTile
-          icon={Activity} tone="info" label="In progress"
+          icon={Activity} tone="info" label={t('visitQueue.kpiInProgress')}
           value={counts.IN_FLIGHT}
           active={groupFilter === 'IN_FLIGHT'}
           onClick={() => setGroupFilter(groupFilter === 'IN_FLIGHT' ? null : 'IN_FLIGHT')}
         />
         <KpiTile
-          icon={CheckCircle2} tone="success" label="Completed today"
+          icon={CheckCircle2} tone="success" label={t('visitQueue.kpiCompletedToday')}
           value={counts.COMPLETED}
           active={groupFilter === 'COMPLETED'}
           onClick={() => setGroupFilter(groupFilter === 'COMPLETED' ? null : 'COMPLETED')}
@@ -177,7 +173,7 @@ export function VisitQueuePage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by visit ID, patient name, or MRN…"
+              placeholder={t('visitQueue.searchPlaceholder')}
               className="h-9 w-full rounded-lg border border-ink-200 bg-white ps-9 pe-8 text-sm placeholder:text-ink-400 focus:border-brand-500"
             />
             {query && (
@@ -187,19 +183,19 @@ export function VisitQueuePage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-medium text-ink-600">Type:</span>
-            <FilterPill active={typeFilter === null} onClick={() => setTypeFilter(null)}>All</FilterPill>
-            {VISIT_TYPES.map((t) => {
-              const Icon = TYPE_ICON[t];
+            <span className="font-medium text-ink-600">{t('visitQueue.type')}</span>
+            <FilterPill active={typeFilter === null} onClick={() => setTypeFilter(null)}>{t('common.all')}</FilterPill>
+            {VISIT_TYPES.map((vt) => {
+              const Icon = TYPE_ICON[vt];
               return (
-                <FilterPill key={t} active={typeFilter === t} onClick={() => setTypeFilter(typeFilter === t ? null : t)}>
-                  <Icon size={11} className="me-1" /> {TYPE_LABEL[t]}
+                <FilterPill key={vt} active={typeFilter === vt} onClick={() => setTypeFilter(typeFilter === vt ? null : vt)}>
+                  <Icon size={11} className="me-1" /> {t(`visitType.${vt}`)}
                 </FilterPill>
               );
             })}
             {(query || typeFilter || groupFilter) && (
               <button type="button" onClick={() => { setQuery(''); setTypeFilter(null); setGroupFilter(null); }} className="ms-auto text-ink-500 hover:text-ink-900">
-                Clear filters
+                {t('visitQueue.clearFilters')}
               </button>
             )}
           </div>
@@ -209,7 +205,7 @@ export function VisitQueuePage() {
         {isLoading ? (
           <TableSkeleton />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={ListOrdered} title="Nothing here" description={query ? `No visits match "${query}".` : 'No active visits in the system.'} />
+          <EmptyState icon={ListOrdered} title={t('visitQueue.nothingHere')} description={query ? t('visitQueue.noMatch', { query }) : t('visitQueue.noActive')} />
         ) : (
           <div>
             {visibleGroups.map((g) => {
@@ -218,8 +214,8 @@ export function VisitQueuePage() {
               return (
                 <StatusGroup
                   key={g.key}
-                  title={g.label}
-                  description={g.description}
+                  title={t(g.labelKey)}
+                  description={g.descKey ? t(g.descKey) : ''}
                   tone={g.tone}
                   count={rows.length}
                   rows={rows}
@@ -250,6 +246,7 @@ function StatusGroup({
   onOpen: (v: Visit) => void;
   dt: Intl.DateTimeFormat;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
   const accentBar = {
     danger:  'bg-brand-600',
@@ -287,7 +284,7 @@ function StatusGroup({
       </button>
       {open && (
         rows.length === 0 ? (
-          <p className="px-5 pb-3 text-xs text-ink-500">Nothing in this group.</p>
+          <p className="px-5 pb-3 text-xs text-ink-500">{t('visitQueue.nothingInGroup')}</p>
         ) : (
           <table className="w-full text-sm">
             <tbody className="divide-y divide-ink-100">
@@ -303,8 +300,8 @@ function StatusGroup({
 /* ============================================================== Row ============================================================== */
 
 function Row({ v, onOpen, dt }: { v: Visit; onOpen: (v: Visit) => void; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   const Icon = TYPE_ICON[v.visitType] ?? ListOrdered;
-  const status = STATUS_TONE[v.status];
   const ageMin = visitAgeMinutes(v);
   const ageTone = ageColor(ageMin, v.status);
 
@@ -324,7 +321,7 @@ function Row({ v, onOpen, dt }: { v: Visit; onOpen: (v: Visit) => void; dt: Intl
         <span className="font-mono text-xs font-semibold text-ink-900">{v.visitDisplayId}</span>
         {v.parentVisitId && (
           <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-ink-500">
-            <CornerDownRight size={10} className="rtl:-scale-x-100" /> from {TYPE_LABEL[v.originatingType ?? 'DOCTOR_APPOINTMENT']}
+            <CornerDownRight size={10} className="rtl:-scale-x-100" /> {t('visitQueue.fromOrigin', { origin: t(`visitType.${v.originatingType ?? 'DOCTOR_APPOINTMENT'}`) })}
           </div>
         )}
       </td>
@@ -339,10 +336,10 @@ function Row({ v, onOpen, dt }: { v: Visit; onOpen: (v: Visit) => void; dt: Intl
         <div className="font-mono text-[11px] text-ink-500">{v.patientMrn}</div>
       </td>
       <td className="px-2 py-2.5 text-xs text-ink-700">
-        <Badge tone="info">{TYPE_LABEL[v.visitType]}</Badge>
+        <Badge tone="info">{t(`visitType.${v.visitType}`)}</Badge>
       </td>
       <td className="px-2 py-2.5">
-        <Badge tone={status.tone} dot>{status.label}</Badge>
+        <Badge tone={STATUS_TONE[v.status]} dot>{t(`visitStatus.${v.status}`)}</Badge>
       </td>
       <td className="px-2 py-2.5 text-xs text-ink-500">
         {dt.format(new Date(v.startedAt))}
@@ -355,7 +352,7 @@ function Row({ v, onOpen, dt }: { v: Visit; onOpen: (v: Visit) => void; dt: Intl
                                    'text-ink-600',
         )}>
           {ageTone !== 'normal' && <Clock size={11} />}
-          {humanAge(ageMin)}
+          {humanAge(ageMin, t)}
         </span>
       </td>
       <td className="pe-5 ps-2 py-2.5 text-end">
@@ -372,9 +369,9 @@ function visitAgeMinutes(v: Visit): number {
   return Math.max(0, (ref.getTime() - new Date(v.startedAt).getTime()) / 60000);
 }
 
-function humanAge(minutes: number): string {
+function humanAge(minutes: number, t: TFunction): string {
   const m = Math.round(minutes);
-  if (m < 1)  return 'just now';
+  if (m < 1)  return t('visitQueue.justNow');
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   const rem = m % 60;
