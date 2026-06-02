@@ -29,10 +29,11 @@ public class ListPaymentsController {
     public Page<PaymentResponse> search(
             @RequestParam(value = "status", required = false) PaymentStatus status,
             @RequestParam(value = "stage", required = false) PaymentStage stage,
+            @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        return handler.search(status, stage, page, size).map(PaymentResponse::from);
+        return handler.search(status, stage, q, page, size).map(PaymentResponse::from);
     }
 
     @GetMapping("/{id}")

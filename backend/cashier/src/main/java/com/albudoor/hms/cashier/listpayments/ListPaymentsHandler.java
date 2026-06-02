@@ -23,8 +23,25 @@ public class ListPaymentsHandler {
     }
 
     @Transactional(readOnly = true)
-    public Page<Payment> search(PaymentStatus status, PaymentStage stage, int page, int size) {
-        return repo.search(status, stage, PageRequest.of(page, Math.min(size, 100)));
+    public Page<Payment> search(PaymentStatus status, PaymentStage stage, String q, int page, int size) {
+        return repo.search(status, stage, likePattern(q), PageRequest.of(page, Math.min(size, 100)));
+    }
+
+    /**
+     * Turns a free-text query into a case-insensitive {@code %…%} LIKE pattern, escaping the
+     * SQL wildcards {@code % _ \} (with backslash as the ESCAPE char) so user input can never
+     * act as a wildcard or injection. Returns {@code null} for blank input so the query skips
+     * the filter entirely.
+     */
+    static String likePattern(String q) {
+        if (q == null || q.isBlank()) {
+            return null;
+        }
+        String escaped = q.trim().toLowerCase()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     @Transactional(readOnly = true)
