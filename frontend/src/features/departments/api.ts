@@ -138,9 +138,15 @@ export async function deleteAttachment(id: string): Promise<void> {
   await api.delete(`/dept-cases/attachments/${id}`);
 }
 
-export function attachmentDownloadUrl(id: string): string {
-  // Backend base is configured in axios client; just return the relative path.
-  return `/api/dept-cases/attachments/${id}/file`;
+/**
+ * Fetch an attachment through the authed axios client (the Bearer token is required now that
+ * the endpoint is role-gated — a raw <a href> sends no Authorization header and 401/403s).
+ * Returns a blob object-URL the caller must revoke once the download/open is done.
+ */
+export async function downloadAttachment(id: string): Promise<{ url: string; contentType: string }> {
+  const res = await api.get(`/dept-cases/attachments/${id}/file`, { responseType: 'blob' });
+  const blob = res.data as Blob;
+  return { url: URL.createObjectURL(blob), contentType: blob.type };
 }
 
 export type IncomingVisit = Visit & { hasCase?: boolean };

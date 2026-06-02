@@ -77,7 +77,10 @@ export function CashierQueuePage() {
   const cashExposure  = pendingAll.reduce((s, p) => s + p.totalDue, 0);
   const oldestPendingMin = pendingAll.length === 0 ? 0
     : Math.max(...pendingAll.map((p) => paymentAgeMinutes(p)));
-  const receivedToday = approvedTodayList.reduce((s, p) => s + p.totalDue, 0);
+  // Cash actually received today excludes VIP-bypass approvals (no money changed hands).
+  const receivedToday = approvedTodayList
+    .filter((p) => !p.vipBypass && p.paymentMethod !== 'VIP_BYPASS')
+    .reduce((s, p) => s + p.totalDue, 0);
   const stageCounts: Record<PaymentStage, number> = { INITIAL: 0, REFERRAL: 0, FINAL: 0, STAY_EXTENSION: 0, PHARMACY: 0 };
   for (const p of pendingAll) stageCounts[p.stage]++;
 

@@ -20,7 +20,7 @@ import { extractApiError } from '@/shared/api/client';
 import { listItems } from '@/features/admin/catalogues/api';
 import {
   listCases, openCase, uploadFindings, finalizeCase, listIncomingVisits,
-  listCaseAttachments, uploadAttachment, deleteAttachment, attachmentDownloadUrl,
+  listCaseAttachments, uploadAttachment, deleteAttachment, downloadAttachment,
   CaseStatus, DepartmentCase, DepartmentCategory, CaseLine,
 } from './api';
 import type { Visit } from '@/features/reception/visits/api';
@@ -537,6 +537,26 @@ function ServiceLineCard({
     onError: (err) => toast.error(extractApiError(err)?.message ?? 'Delete failed'),
   });
 
+  // The download endpoint is role-gated, so we must go through the authed axios client
+  // (a raw <a href> carries no Bearer token). Open the blob in a new tab; revoke after.
+  async function openAttachment(id: string, fileName: string) {
+    try {
+      const { url } = await downloadAttachment(id);
+      const win = window.open(url, '_blank', 'noopener');
+      if (!win) {
+        // Pop-up blocked — fall back to a programmatic download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+      }
+      // Give the browser a moment to start loading before revoking.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      toast.error(extractApiError(err)?.message ?? 'Download failed');
+    }
+  }
+
   return (
     <div className={cn('rounded-lg border', isUploaded ? 'border-emerald-200 bg-emerald-50/30' : 'border-ink-200')}>
       <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -602,14 +622,13 @@ function ServiceLineCard({
             <ul className="space-y-1">
               {myAttachments.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 rounded-md bg-ink-50/50 px-2 py-1.5">
-                  <a
-                    href={attachmentDownloadUrl(a.id)}
-                    target="_blank"
-                    rel="noopener"
-                    className="flex-1 truncate text-sm text-brand-700 hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(a.id, a.fileName)}
+                    className="flex-1 truncate text-start text-sm text-brand-700 hover:underline"
                   >
                     {a.fileName}
-                  </a>
+                  </button>
                   <span className="font-mono text-[10px] text-ink-500">{(a.sizeBytes / 1024).toFixed(0)} KB</span>
                   {canUpload && (
                     <button
