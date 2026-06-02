@@ -21,9 +21,13 @@ public class AddServiceItemHandler {
 
     @Transactional
     public ServiceItem handle(AddServiceItemCommand cmd) {
-        if (repo.existsByCategoryAndCode(cmd.category(), cmd.code())) {
+        // Normalise the code the same way ServiceItem.create stores it (trim) BEFORE checking
+        // uniqueness, and check case-insensitively, so " PRB1 " can't bypass the guard (→ 500
+        // on the DB constraint) and "prb1"/"PRB1" can't coexist in one category.
+        String code = cmd.code() == null ? null : cmd.code().trim();
+        if (code != null && repo.existsByCategoryAndCodeIgnoreCase(cmd.category(), code)) {
             throw new ConflictException("SERVICE_CODE_EXISTS",
-                    "Code '" + cmd.code() + "' already exists in category " + cmd.category());
+                    "Code '" + code + "' already exists in category " + cmd.category());
         }
 
         DrugDetails drugDetails = null;
@@ -40,7 +44,7 @@ public class AddServiceItemHandler {
 
         ServiceItem item = ServiceItem.create(
                 cmd.category(),
-                cmd.code(),
+                code,
                 cmd.nameEn(),
                 cmd.nameAr(),
                 cmd.description(),

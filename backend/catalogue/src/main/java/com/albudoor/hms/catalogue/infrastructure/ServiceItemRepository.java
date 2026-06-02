@@ -12,6 +12,9 @@ public interface ServiceItemRepository extends JpaRepository<ServiceItem, UUID> 
 
     boolean existsByCategoryAndCode(ServiceCategory category, String code);
 
+    /** Case-insensitive code uniqueness check (so 'prb1' and 'PRB1' cannot coexist). */
+    boolean existsByCategoryAndCodeIgnoreCase(ServiceCategory category, String code);
+
     Optional<ServiceItem> findByCategoryAndCode(ServiceCategory category, String code);
 
     List<ServiceItem> findAllByCategoryOrderBySortOrderAscNameEnAsc(ServiceCategory category);
