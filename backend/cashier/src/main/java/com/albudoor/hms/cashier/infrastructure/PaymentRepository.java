@@ -32,4 +32,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     boolean existsByVisitIdAndStageAndStatusIn(
             UUID visitId, PaymentStage stage, List<PaymentStatus> statuses);
+
+    long countByStatus(PaymentStatus status);
 }

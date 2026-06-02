@@ -29,4 +29,6 @@ public interface DepartmentCaseRepository extends JpaRepository<DepartmentCase, 
     );
 
     List<DepartmentCase> findAllByPatientIdOrderByCreatedAtDesc(UUID patientId);
+
+    long countByStatusIn(List<DepartmentCaseStatus> statuses);
 }

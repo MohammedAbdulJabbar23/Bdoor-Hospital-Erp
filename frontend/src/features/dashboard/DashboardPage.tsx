@@ -1,48 +1,94 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Users,
   Wallet,
   BedDouble,
   ListOrdered,
   ArrowUpRight,
-  ArrowDownRight,
   UserPlus,
   CalendarPlus,
   CreditCard,
   Activity,
   Clock,
-  CheckCircle2,
   AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardBody, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { Badge } from '@/shared/ui/Badge';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { useAuthStore } from '@/shared/auth/authStore';
-
-type Trend = 'up' | 'down' | 'flat';
+import { getDashboardSummary, type DashboardSummary } from './api';
 
 type Kpi = {
   i18nKey: string;
   value: string;
-  delta?: string;
-  trend?: Trend;
+  subtitle?: string;
   icon: LucideIcon;
   tone: 'brand' | 'success' | 'warning' | 'info';
 };
 
-// Stub values — wired up once the corresponding backend endpoints land.
-const KPIS: Kpi[] = [
-  { i18nKey: 'dashboard.kpi.patientsToday',  value: '24', delta: '+8%',  trend: 'up',   icon: Users,        tone: 'brand'   },
-  { i18nKey: 'dashboard.kpi.pendingPayments',value: '6',  delta: '−2',   trend: 'down', icon: Wallet,       tone: 'warning' },
-  { i18nKey: 'dashboard.kpi.bedsOccupancy',  value: '12 / 20', delta: '60%', trend: 'flat', icon: BedDouble, tone: 'info'    },
-  { i18nKey: 'dashboard.kpi.activeQueues',   value: '4',  delta: '0',    trend: 'flat', icon: ListOrdered, tone: 'success' },
+function buildKpis(s: DashboardSummary): Kpi[] {
+  const pct = s.bedsTotal > 0 ? Math.round((s.bedsOccupied / s.bedsTotal) * 100) : 0;
+  return [
+    { i18nKey: 'dashboard.kpi.patientsToday',   value: String(s.patientsToday),                icon: Users,       tone: 'brand'   },
+    { i18nKey: 'dashboard.kpi.pendingPayments', value: String(s.pendingPayments),              icon: Wallet,      tone: 'warning' },
+    { i18nKey: 'dashboard.kpi.bedsOccupancy',   value: `${s.bedsOccupied} / ${s.bedsTotal}`, subtitle: `${pct}%`, icon: BedDouble, tone: 'info' },
+    { i18nKey: 'dashboard.kpi.activeQueues',    value: String(s.activeQueues),                 icon: ListOrdered, tone: 'success' },
+  ];
+}
+
+const KPI_META: Pick<Kpi, 'i18nKey' | 'icon' | 'tone'>[] = [
+  { i18nKey: 'dashboard.kpi.patientsToday',   icon: Users,       tone: 'brand'   },
+  { i18nKey: 'dashboard.kpi.pendingPayments', icon: Wallet,      tone: 'warning' },
+  { i18nKey: 'dashboard.kpi.bedsOccupancy',   icon: BedDouble,   tone: 'info'    },
+  { i18nKey: 'dashboard.kpi.activeQueues',    icon: ListOrdered, tone: 'success' },
 ];
 
 export function DashboardPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: getDashboardSummary,
+    refetchInterval: 30000,
+  });
+
+  const kpis = data ? buildKpis(data) : null;
+
+  const attention = [
+    {
+      key: 'pendingPayments',
+      count: data?.pendingPaymentsCount ?? 0,
+      tone: 'warning' as const,
+      icon: Wallet,
+      title: t('dashboard.attention.pendingPaymentsTitle', { count: data?.pendingPaymentsCount ?? 0 }),
+      body: t('dashboard.attention.pendingPaymentsBody'),
+      to: '/cashier',
+    },
+    {
+      key: 'labResults',
+      count: data?.labResultsAwaiting ?? 0,
+      tone: 'info' as const,
+      icon: Activity,
+      title: t('dashboard.attention.labResultsTitle', { count: data?.labResultsAwaiting ?? 0 }),
+      body: t('dashboard.attention.labResultsBody'),
+      to: '/departments/laboratory',
+    },
+    {
+      key: 'bedExpiry',
+      count: data?.bedsExpiringSoon ?? 0,
+      tone: 'danger' as const,
+      icon: Clock,
+      title: t('dashboard.attention.bedExpiryTitle', { count: data?.bedsExpiringSoon ?? 0 }),
+      body: t('dashboard.attention.bedExpiryBody'),
+      to: '/departments/emergency',
+    },
+  ].filter((a) => a.count > 0);
 
   return (
     <>
@@ -51,10 +97,16 @@ export function DashboardPage() {
         description={t('dashboard.summary')}
       />
 
+      {isError && (
+        <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200">
+          {t('common.loadError', 'Could not load live metrics right now.')}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {KPIS.map((k) => (
-          <KpiTile key={k.i18nKey} kpi={k} />
-        ))}
+        {isLoading || !kpis
+          ? KPI_META.map((m) => <KpiTileSkeleton key={m.i18nKey} kpi={m} />)
+          : kpis.map((k) => <KpiTile key={k.i18nKey} kpi={k} />)}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -64,32 +116,32 @@ export function DashboardPage() {
               <AlertTriangle size={16} className="text-amber-500" />
               {t('dashboard.sections.attention')}
             </CardTitle>
-            <Badge tone="warning" dot>
-              3
-            </Badge>
+            {!isLoading && attention.length > 0 && (
+              <Badge tone="warning" dot>
+                {attention.length}
+              </Badge>
+            )}
           </CardHeader>
           <CardBody className="space-y-3">
-            <AttentionRow
-              tone="warning"
-              icon={Wallet}
-              title={t('dashboard.attention.pendingPaymentsTitle', { count: 6 })}
-              body={t('dashboard.attention.pendingPaymentsBody')}
-              to="/cashier"
-            />
-            <AttentionRow
-              tone="info"
-              icon={Activity}
-              title={t('dashboard.attention.labResultsTitle', { count: 4 })}
-              body={t('dashboard.attention.labResultsBody')}
-              to="/departments/laboratory"
-            />
-            <AttentionRow
-              tone="danger"
-              icon={Clock}
-              title={t('dashboard.attention.bedExpiryTitle', { count: 2 })}
-              body={t('dashboard.attention.bedExpiryBody')}
-              to="/departments/emergency"
-            />
+            {isLoading ? (
+              <>
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </>
+            ) : attention.length === 0 ? (
+              <p className="px-1 py-4 text-sm text-ink-500">{t('dashboard.attention.empty')}</p>
+            ) : (
+              attention.map((a) => (
+                <AttentionRow
+                  key={a.key}
+                  tone={a.tone}
+                  icon={a.icon}
+                  title={a.title}
+                  body={a.body}
+                  to={a.to}
+                />
+              ))
+            )}
           </CardBody>
         </Card>
 
@@ -112,38 +164,16 @@ export function DashboardPage() {
             <CardTitle>{t('dashboard.sections.activity')}</CardTitle>
           </CardHeader>
           <CardBody>
-            <ul className="divide-y divide-ink-100">
-              <ActivityRow
-                tone="success"
-                title={t('dashboard.activity.patientRegistered')}
-                detail="MRN ALB-2026-000004 · Layla Hassan"
-                when="2m ago"
-              />
-              <ActivityRow
-                tone="success"
-                title={t('dashboard.activity.paymentApproved')}
-                detail="ALB-2026-000003 · IQD 45,000"
-                when="9m ago"
-              />
-              <ActivityRow
-                tone="info"
-                title={t('dashboard.activity.caseForwarded', { dept: t('nav.laboratory') })}
-                detail="Visit V-218 · ordered by Dr. Kareem"
-                when="14m ago"
-              />
-            </ul>
+            <EmptyState icon={Activity} title={t('dashboard.activity.empty')} />
           </CardBody>
         </Card>
       </div>
-
-      <p className="mt-4 px-1 text-xs text-ink-400">{t('dashboard.stub')}</p>
     </>
   );
 }
 
 function KpiTile({ kpi }: { kpi: Kpi }) {
   const { t } = useTranslation();
-  const TrendIcon = kpi.trend === 'down' ? ArrowDownRight : ArrowUpRight;
   const tone = {
     brand:   'bg-brand-50 text-brand-700',
     success: 'bg-emerald-50 text-emerald-700',
@@ -159,17 +189,34 @@ function KpiTile({ kpi }: { kpi: Kpi }) {
             {t(kpi.i18nKey)}
           </p>
           <p className="mt-1.5 text-2xl font-semibold tracking-tight text-ink-900">{kpi.value}</p>
-          {kpi.delta && (
-            <p
-              className={
-                'mt-2 inline-flex items-center gap-1 text-xs font-medium ' +
-                (kpi.trend === 'down' ? 'text-brand-700' : kpi.trend === 'up' ? 'text-emerald-700' : 'text-ink-500')
-              }
-            >
-              {kpi.trend !== 'flat' && <TrendIcon size={12} />}
-              {kpi.delta}
+          {kpi.subtitle && (
+            <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-ink-500">
+              {kpi.subtitle}
             </p>
           )}
+        </div>
+        <span className={'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ' + tone}>
+          <kpi.icon size={18} aria-hidden />
+        </span>
+      </CardBody>
+    </Card>
+  );
+}
+
+function KpiTileSkeleton({ kpi }: { kpi: Pick<Kpi, 'i18nKey' | 'icon' | 'tone'> }) {
+  const { t } = useTranslation();
+  const tone = {
+    brand:   'bg-brand-50 text-brand-700',
+    success: 'bg-emerald-50 text-emerald-700',
+    warning: 'bg-amber-50 text-amber-800',
+    info:    'bg-sky-50 text-sky-700',
+  }[kpi.tone];
+  return (
+    <Card>
+      <CardBody className="flex items-start justify-between gap-3 p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{t(kpi.i18nKey)}</p>
+          <Skeleton className="mt-2 h-7 w-16" />
         </div>
         <span className={'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ' + tone}>
           <kpi.icon size={18} aria-hidden />
@@ -212,39 +259,6 @@ function AttentionRow({
       </div>
       <ArrowUpRight size={16} className="mt-1 text-ink-400 rtl:-scale-x-100" />
     </Link>
-  );
-}
-
-function ActivityRow({
-  tone,
-  title,
-  detail,
-  when,
-}: {
-  tone: 'success' | 'info' | 'warning';
-  title: string;
-  detail: string;
-  when: string;
-}) {
-  const dotCls = {
-    success: 'bg-emerald-500',
-    info: 'bg-sky-500',
-    warning: 'bg-amber-500',
-  }[tone];
-  return (
-    <li className="flex items-center gap-3 py-3">
-      <span className={'h-2 w-2 shrink-0 rounded-full ' + dotCls} />
-      {tone === 'success' ? (
-        <CheckCircle2 size={14} className="text-emerald-600" />
-      ) : (
-        <Activity size={14} className="text-sky-600" />
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm text-ink-900">{title}</p>
-        <p className="truncate text-xs text-ink-500">{detail}</p>
-      </div>
-      <span className="text-xs text-ink-400">{when}</span>
-    </li>
   );
 }
 

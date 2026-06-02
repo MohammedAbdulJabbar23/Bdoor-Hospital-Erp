@@ -4,6 +4,7 @@ import com.albudoor.hms.emergency.domain.EmergencyCase;
 import com.albudoor.hms.emergency.domain.EmergencyCaseStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,4 +15,6 @@ public interface EmergencyCaseRepository extends JpaRepository<EmergencyCase, UU
     Optional<EmergencyCase> findByFinalPaymentId(UUID paymentId);
     Optional<EmergencyCase> findByBedIdAndStatusIn(UUID bedId, List<EmergencyCaseStatus> statuses);
     List<EmergencyCase> findAllByStatusInOrderByAdmittedAtDesc(List<EmergencyCaseStatus> statuses);
+
+    long countByStatusInAndStayExpiresAtBefore(List<EmergencyCaseStatus> statuses, Instant threshold);
 }

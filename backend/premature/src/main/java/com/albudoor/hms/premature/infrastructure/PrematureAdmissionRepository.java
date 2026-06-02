@@ -4,6 +4,7 @@ import com.albudoor.hms.premature.domain.AdmissionStatus;
 import com.albudoor.hms.premature.domain.PrematureAdmission;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,4 +22,6 @@ public interface PrematureAdmissionRepository extends JpaRepository<PrematureAdm
     List<PrematureAdmission> findAllByStatusInOrderByAdmittedAtDesc(List<AdmissionStatus> statuses);
 
     boolean existsByVisitIdAndStatusIn(UUID visitId, List<AdmissionStatus> statuses);
+
+    long countByStatusInAndStayExpiresAtBefore(List<AdmissionStatus> statuses, Instant threshold);
 }

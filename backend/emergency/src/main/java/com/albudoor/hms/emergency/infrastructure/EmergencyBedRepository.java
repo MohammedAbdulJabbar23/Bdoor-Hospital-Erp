@@ -1,5 +1,6 @@
 package com.albudoor.hms.emergency.infrastructure;
 
+import com.albudoor.hms.emergency.domain.BedStatus;
 import com.albudoor.hms.emergency.domain.EmergencyBed;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -14,4 +15,8 @@ public interface EmergencyBedRepository extends JpaRepository<EmergencyBed, UUID
     Optional<EmergencyBed> findByCode(String code);
 
     List<EmergencyBed> findAllByOrderByCodeAsc();
+
+    long countByStatus(BedStatus status);
+
+    long countByActiveTrue();
 }

@@ -1,6 +1,7 @@
 package com.albudoor.hms.premature.infrastructure;
 
 import com.albudoor.hms.premature.domain.Bed;
+import com.albudoor.hms.premature.domain.BedStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -14,4 +15,8 @@ public interface BedRepository extends JpaRepository<Bed, UUID> {
     Optional<Bed> findByCode(String code);
 
     List<Bed> findAllByOrderByCodeAsc();
+
+    long countByStatus(BedStatus status);
+
+    long countByActiveTrue();
 }
