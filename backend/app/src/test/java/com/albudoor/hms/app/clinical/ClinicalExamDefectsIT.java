@@ -293,4 +293,23 @@ class ClinicalExamDefectsIT extends IntegrationTest {
             assertThat(line.getLineTotal()).isNotNull();
         });
     }
+
+    // ---- Fix #7: exam read restricted to clinical roles ----
+
+    @Test
+    void getExam_clinicalRoleAllowed_nonClinicalForbidden() {
+        String visitId = inProgressDoctorVisit();
+        Map<?, ?> exam = put("/api/exams", examBody(visitId), "doctor", Map.class);
+        String examId = (String) exam.get("id");
+
+        // Clinical role (doctor) can read diagnoses/prescriptions.
+        ResponseEntity<Map> docRead = getRaw("/api/exams/" + examId, "doctor");
+        assertThat(docRead.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> docByVisit = getRaw("/api/exams/by-visit/" + visitId, "doctor");
+        assertThat(docByVisit.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Non-clinical role (cashier) must be forbidden from reading clinical PHI.
+        ResponseEntity<Map> cashierRead = getRaw("/api/exams/" + examId, "cashier");
+        assertThat(cashierRead.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
 }

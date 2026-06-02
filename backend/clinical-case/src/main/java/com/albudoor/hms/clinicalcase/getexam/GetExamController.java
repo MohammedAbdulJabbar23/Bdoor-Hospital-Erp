@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/exams")
-@PreAuthorize("isAuthenticated()")
+@PreAuthorize("hasAnyRole('DOCTOR', 'EMERGENCY_STAFF', 'PREMATURE_STAFF', 'NURSE', 'ADMIN')")
 public class GetExamController {
 
     private final DoctorExamRepository repo;
