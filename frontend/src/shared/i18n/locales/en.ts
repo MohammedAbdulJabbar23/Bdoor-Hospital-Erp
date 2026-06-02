@@ -27,6 +27,7 @@ export default {
     prematureBeds: 'Premature beds',
     emergencyBeds: 'Emergency beds',
     pharmacy: 'Pharmacy',
+    pharmacyInventory: 'Pharmacy inventory',
     cashier: 'Cashier',
     users: 'Users & roles',
     catalogues: 'Catalogues',
