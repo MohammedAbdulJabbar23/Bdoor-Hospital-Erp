@@ -99,10 +99,11 @@ emergency `FinishTreatmentHandler`. Explicit bean names per the mirror-module co
 (`@Service("emergencyOrderWorkupHandler")` etc.).
 
 ### 5.4 RESULTS_PENDING error contract
-Introduce a dedicated `ResultsPendingException` in `platform` (carrying the open-order list) and map
-it in the global exception handler to **409 Conflict** with body `{ code: "RESULTS_PENDING",
-message, pendingOrders: [{ visitDisplayId, visitType, status }] }`, so the UI can list what's open
-(a plain `DomainException` can't carry the structured payload). Both finish handlers throw it.
+Introduce a dedicated `ResultsPendingException` in `platform` (extends `ConflictException`) that the
+global exception handler maps to **409 Conflict** with body `{ code: "RESULTS_PENDING", message }` —
+the same `{code, message}` shape as every other error. The `message` enumerates the open orders, and
+the UI shows that message while re-rendering the live order list from `GET …/orders`; there is no
+separate `pendingOrders[]` array. Both finish handlers throw it.
 
 ## 6. State interactions
 - Bed-stay visit stays `IN_PROGRESS` across ordering and result return (never `AWAITING_RESULTS`).
