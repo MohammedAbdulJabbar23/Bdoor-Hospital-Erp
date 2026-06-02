@@ -256,4 +256,20 @@ class PrematureOrdersIT extends IntegrationTest {
                 Map.of("targetType", "LABORATORY"), "cashier");
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    /**
+     * The generic pausing forward must refuse bed-stay parents — they have to use the
+     * non-pausing department order flow instead. (FIX M1)
+     */
+    @Test
+    void genericPausingForward_onBedStayVisit_isRejected() {
+        String[] s = admitUnderCare();
+        String visitId = s[1];
+
+        ResponseEntity<Map> res = postRaw("/api/visits/" + visitId + "/forward",
+                Map.of("targetType", "LABORATORY"), "premature");
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(res.getBody().get("code")).isEqualTo("INVALID_FORWARD_SOURCE");
+    }
 }

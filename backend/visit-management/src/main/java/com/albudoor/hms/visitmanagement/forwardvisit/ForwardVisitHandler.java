@@ -4,6 +4,7 @@ import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.visitmanagement.domain.Visit;
 import com.albudoor.hms.visitmanagement.domain.VisitForwardedEvent;
+import com.albudoor.hms.visitmanagement.domain.VisitType;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitIdGenerator;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -50,6 +51,12 @@ public class ForwardVisitHandler {
         if (cmd.targetType() == parent.getVisitType()) {
             throw new DomainException("INVALID_FORWARD_TARGET",
                     "Cannot forward a visit to its own visit type");
+        }
+
+        if (pauseParent && (parent.getVisitType() == VisitType.PREMATURE
+                || parent.getVisitType() == VisitType.EMERGENCY)) {
+            throw new DomainException("INVALID_FORWARD_SOURCE",
+                    "Bed-stay visits (premature/emergency) must order via the department order flow, not the pausing forward");
         }
 
         Visit child = Visit.createForwarded(
