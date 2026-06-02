@@ -3,6 +3,7 @@ package com.albudoor.hms.patientregistry.registerinfant;
 import com.albudoor.hms.patientregistry.domain.DeliveryType;
 import com.albudoor.hms.patientregistry.domain.Gender;
 import com.albudoor.hms.patientregistry.domain.PlaceOfBirth;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -35,8 +36,8 @@ public record RegisterInfantCommand(
 
         @NotNull PlaceOfBirth placeOfBirth,
         @NotNull DeliveryType deliveryType,
-        @Min(0) Integer apgar1Min,
-        @Min(0) Integer apgar5Min,
+        @Min(0) @Max(10) Integer apgar1Min,
+        @Min(0) @Max(10) Integer apgar5Min,
         @Positive BigDecimal birthWeightKg,
         @Positive BigDecimal lengthCm,
         @Positive BigDecimal ofcCm,

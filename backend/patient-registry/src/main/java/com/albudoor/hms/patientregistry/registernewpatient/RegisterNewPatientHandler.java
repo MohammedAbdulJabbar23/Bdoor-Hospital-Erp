@@ -28,15 +28,22 @@ public class RegisterNewPatientHandler {
 
     @Transactional
     public Patient handle(RegisterNewPatientCommand cmd) {
-        // National-ID uniqueness is a soft constraint — handled at the DB unique index level
-        // when the client confirms the rule. For now, MRN is the only hard unique key.
+        // National-ID uniqueness is enforced both here (fast, friendly 409) and at the DB
+        // level via a UNIQUE partial index on national_id WHERE national_id IS NOT NULL
+        // (migration V023) which catches concurrent inserts that race past this check.
+        String nationalId = blankToNull(cmd.nationalId());
+        if (nationalId != null && patients.existsByAdultDetails_NationalId(nationalId)) {
+            throw new ConflictException("DUPLICATE_PATIENT",
+                    "A patient with national ID " + nationalId + " already exists");
+        }
+
         String mrn = mrnGenerator.next();
         if (patients.existsByMrn(mrn)) {
             throw new ConflictException("MRN_COLLISION", "MRN collision; retry registration");
         }
 
         AdultDetails details = new AdultDetails(
-                blankToNull(cmd.nationalId()),
+                nationalId,
                 blankToNull(cmd.mobileNumber()),
                 blankToNull(cmd.address()),
                 blankToNull(cmd.occupation()),

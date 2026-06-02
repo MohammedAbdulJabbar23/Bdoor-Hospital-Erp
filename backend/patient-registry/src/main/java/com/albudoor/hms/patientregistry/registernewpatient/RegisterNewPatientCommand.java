@@ -4,6 +4,7 @@ import com.albudoor.hms.patientregistry.domain.Gender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -13,10 +14,17 @@ public record RegisterNewPatientCommand(
         @NotNull Gender gender,
         @NotNull @Past LocalDate dateOfBirth,
         @Size(max = 50) String nationalId,
-        @Size(max = 30) String mobileNumber,
+        // Lenient phone shape: digits, plus, dashes, parens and spaces, 6–20 chars. Accepts
+        // the test/e2e data (10-digit "077…") while rejecting clearly-bogus values.
+        @Size(max = 30) @Pattern(regexp = MOBILE_PATTERN, message = "must be a valid phone number")
+        String mobileNumber,
         @Size(max = 500) String address,
         @Size(max = 200) String occupation,
         @Size(max = 200) String emergencyContactName,
-        @Size(max = 30) String emergencyContactMobile,
+        @Size(max = 30) @Pattern(regexp = MOBILE_PATTERN, message = "must be a valid phone number")
+        String emergencyContactMobile,
         boolean vip
-) {}
+) {
+    /** Shared lenient phone format. {@code @Pattern} skips null, so optional fields stay optional. */
+    static final String MOBILE_PATTERN = "^[0-9+\\-() ]{6,20}$";
+}
