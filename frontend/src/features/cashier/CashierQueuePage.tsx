@@ -39,16 +39,23 @@ export function CashierQueuePage() {
 
   // Debounce the search box so we don't fire a request on every keystroke. The e2e fills the
   // box in one shot then waits for the row, so a short debounce stays well within its timeout.
-  const debouncedQuery = useDebounced(query, 250);
+  const debouncedQuery = useDebounced(query, 200);
+  const appliedQuery = debouncedQuery.trim();
 
   // Page being viewed (filtered server-side by tab/stage/q, paginated). Server-side q means the
   // search spans the WHOLE queue, not just the loaded page.
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['payments', tab, stage, page, debouncedQuery],
-    queryFn: () => searchPayments(tab, stage, page, 20, debouncedQuery),
+  const { data, isLoading, isFetching, isPlaceholderData } = useQuery({
+    queryKey: ['payments', tab, stage, page, appliedQuery],
+    queryFn: () => searchPayments(tab, stage, page, 20, appliedQuery),
     placeholderData: (prev) => prev,
     refetchInterval: 10000,
   });
+
+  // Search hasn't caught up to what's typed: either the debounce hasn't fired yet, or the new
+  // term's request is still in flight and `data` is still the PREVIOUS term's (placeholder)
+  // results. We hide rows during this window so nobody acts on a row that doesn't match the
+  // current search term (this is what keeps the cashier-search e2e clicking the right row).
+  const searchSettling = query.trim() !== appliedQuery || (appliedQuery !== '' && isPlaceholderData);
 
   // Server-computed KPIs — uncapped DB aggregates, VIP-bypass correctly excluded from received.
   const summaryQuery = useQuery({
@@ -234,7 +241,7 @@ export function CashierQueuePage() {
         </div>
 
         {/* ======================== Table ======================== */}
-        {isLoading ? (
+        {isLoading || searchSettling ? (
           <TableSkeleton />
         ) : sortedRows.length === 0 ? (
           <EmptyState
