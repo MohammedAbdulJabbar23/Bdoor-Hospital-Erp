@@ -210,4 +210,33 @@ class ClinicalExamDefectsIT extends IntegrationTest {
         assertThat(v.get("diastolicBp")).isEqualTo(80);
         assertThat(v.get("heartRate")).isEqualTo(72);
     }
+
+    // ---- Fix #3: nested validation cascade ----
+
+    @Test
+    void upsert_rejectsBlankDiagnosisDescription_with400() {
+        String visitId = inProgressDoctorVisit();
+        Map<String, Object> body = examBody(visitId);
+        Map<String, Object> blank = new HashMap<>();
+        blank.put("code", "X");
+        blank.put("description", "   "); // @NotBlank must now fire via @Valid cascade
+        blank.put("primary", true);
+        body.put("diagnoses", List.of(blank));
+
+        ResponseEntity<Map> res = putRaw("/api/exams", body, "doctor");
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void upsert_rejectsBlankPrescriptionDrugName_with400() {
+        String visitId = inProgressDoctorVisit();
+        Map<String, Object> body = examBody(visitId);
+        Map<String, Object> rx = new HashMap<>();
+        rx.put("drugName", ""); // @NotBlank must now fire via @Valid cascade
+        rx.put("dose", "1 tab");
+        body.put("prescriptions", List.of(rx));
+
+        ResponseEntity<Map> res = putRaw("/api/exams", body, "doctor");
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
 }

@@ -25,8 +25,8 @@ public record UpsertExamCommand(
         @Size(max = 4000) String examinationNotes,
         @Size(max = 4000) String plan,
         @Size(max = 1000) String referralInstructions,
-        List<Diagnosis> diagnoses,
-        List<Prescription> prescriptions
+        @Valid List<Diagnosis> diagnoses,
+        @Valid List<Prescription> prescriptions
 ) {
 
     /**
