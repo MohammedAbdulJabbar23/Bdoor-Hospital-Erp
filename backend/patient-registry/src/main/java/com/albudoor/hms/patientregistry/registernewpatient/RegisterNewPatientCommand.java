@@ -25,6 +25,10 @@ public record RegisterNewPatientCommand(
         String emergencyContactMobile,
         boolean vip
 ) {
-    /** Shared lenient phone format. {@code @Pattern} skips null, so optional fields stay optional. */
-    static final String MOBILE_PATTERN = "^[0-9+\\-() ]{6,20}$";
+    /**
+     * Shared lenient phone format. {@code @Pattern} skips null but NOT empty strings, and the
+     * UI submits unfilled optional fields as "" — so an empty value is explicitly allowed.
+     * Accepts the test/e2e data ("077…" 10 digits) and rejects clearly-bogus values.
+     */
+    static final String MOBILE_PATTERN = "^$|^[0-9+\\-() ]{6,20}$";
 }
