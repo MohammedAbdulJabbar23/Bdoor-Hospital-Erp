@@ -82,19 +82,19 @@ export function AppointmentsPage() {
   const cancelMut = useMutation({
     mutationFn: (id: string) => cancelAppointment(id, 'Cancelled by reception'),
     onSuccess: async () => {
-      toast.success('Appointment cancelled');
+      toast.success(t('appointments.cancelled'));
       await queryClient.invalidateQueries({ queryKey: ['slots', doctorId, date] });
       await queryClient.invalidateQueries({ queryKey: ['appointments', doctorId, date] });
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Cancel failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('appointments.cancelFailed')),
   });
   const checkInMut = useMutation({
     mutationFn: (id: string) => checkInAppointment(id),
     onSuccess: async () => {
-      toast.success('Patient checked in');
+      toast.success(t('appointments.checkedIn'));
       await queryClient.invalidateQueries({ queryKey: ['appointments', doctorId, date] });
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Check-in failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('appointments.checkInFailed')),
   });
 
   const selectedDoctor = doctors?.find((d) => d.id === doctorId);
@@ -108,11 +108,11 @@ export function AppointmentsPage() {
     <>
       <PageHeader
         title={t('nav.appointments')}
-        description="Book consultations against doctor schedules. Walk-ins fill the next free slot."
+        description={t('appointments.description')}
         actions={
           <Button onClick={() => setWalkinOpen(true)} disabled={!selectedDoctor}>
             <Zap size={14} className="me-1.5" />
-            Walk-in
+            {t('appointments.walkin')}
           </Button>
         }
       />
@@ -122,13 +122,13 @@ export function AppointmentsPage() {
         <div className="space-y-4">
           <Card>
             <div className="border-b border-ink-100 px-5 py-4">
-              <h3 className="text-sm font-semibold text-ink-900">Doctor</h3>
+              <h3 className="text-sm font-semibold text-ink-900">{t('appointments.doctor')}</h3>
             </div>
             <div className="p-3">
               {docsLoading ? (
                 <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
               ) : !doctors || doctors.length === 0 ? (
-                <p className="px-2 py-3 text-sm text-ink-500">No active doctors yet.</p>
+                <p className="px-2 py-3 text-sm text-ink-500">{t('appointments.noDoctors')}</p>
               ) : (
                 <ul className="space-y-1">
                   {doctors.map((d) => (
@@ -160,17 +160,17 @@ export function AppointmentsPage() {
 
           <Card>
             <div className="border-b border-ink-100 px-5 py-4">
-              <h3 className="text-sm font-semibold text-ink-900">Date</h3>
+              <h3 className="text-sm font-semibold text-ink-900">{t('appointments.date')}</h3>
             </div>
             <div className="space-y-2 p-4">
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               <p className="text-xs text-ink-500">{dt.format(new Date(date))}</p>
               <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setDate(todayIso())}>Today</Button>
+                <Button variant="secondary" size="sm" onClick={() => setDate(todayIso())}>{t('common.today')}</Button>
                 <Button variant="secondary" size="sm" onClick={() => {
                   const d = new Date(date); d.setDate(d.getDate() + 1);
                   setDate(d.toISOString().slice(0, 10));
-                }}>+1 day</Button>
+                }}>{t('appointments.plusDay')}</Button>
               </div>
             </div>
           </Card>
@@ -183,19 +183,19 @@ export function AppointmentsPage() {
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                   <CalendarDays size={14} className="text-brand-600" />
-                  Available slots {selectedDoctor ? `· ${selectedDoctor.fullName}` : ''}
+                  {t('appointments.availableSlots')} {selectedDoctor ? `· ${selectedDoctor.fullName}` : ''}
                 </h3>
                 <p className="mt-0.5 text-xs text-ink-500">{dt.format(new Date(date))}</p>
               </div>
               {selectedDoctor && slots && (
                 <Badge tone="info">
-                  {slots.filter((s) => s.available).length} / {slots.length} free
+                  {t('appointments.slotsFree', { free: slots.filter((s) => s.available).length, total: slots.length })}
                 </Badge>
               )}
             </div>
             <div className="p-4">
               {!doctorId ? (
-                <p className="px-2 py-8 text-center text-sm text-ink-500">Pick a doctor to see slots.</p>
+                <p className="px-2 py-8 text-center text-sm text-ink-500">{t('appointments.pickDoctor')}</p>
               ) : slotsLoading ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                   {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
@@ -203,8 +203,8 @@ export function AppointmentsPage() {
               ) : !slots || slots.length === 0 ? (
                 <EmptyState
                   icon={CalendarDays}
-                  title="Doctor isn't working this day"
-                  description="No slots in the schedule, or it's a day off. Pick another date."
+                  title={t('appointments.notWorking')}
+                  description={t('appointments.notWorkingDesc')}
                 />
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
@@ -235,25 +235,25 @@ export function AppointmentsPage() {
             <div className="border-b border-ink-100 px-5 py-4">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
                 <UserCheck size={14} className="text-brand-600" />
-                Today's bookings
+                {t('appointments.todaysBookings')}
               </h3>
               <p className="mt-0.5 text-xs text-ink-500">
-                {appts ? `${appts.length} appointment${appts.length === 1 ? '' : 's'}` : ''}
+                {appts ? t('appointments.apptCount', { count: appts.length }) : ''}
               </p>
             </div>
             {!appts || appts.length === 0 ? (
-              <EmptyState icon={CalendarDays} title="No appointments yet" description="Click an available slot above to book one." />
+              <EmptyState icon={CalendarDays} title={t('appointments.noAppointments')} description={t('appointments.noAppointmentsDesc')} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     <tr>
-                      <Th>Time</Th>
-                      <Th>Patient</Th>
-                      <Th>Type</Th>
-                      <Th>Status</Th>
-                      <Th>Visit</Th>
-                      <Th className="text-end">Actions</Th>
+                      <Th>{t('appointments.colTime')}</Th>
+                      <Th>{t('appointments.colPatient')}</Th>
+                      <Th>{t('appointments.colType')}</Th>
+                      <Th>{t('appointments.colStatus')}</Th>
+                      <Th>{t('appointments.colVisit')}</Th>
+                      <Th className="text-end">{t('common.actions')}</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
@@ -268,7 +268,7 @@ export function AppointmentsPage() {
                           <div className="font-mono text-[11px] text-ink-500">{a.patientMrn}</div>
                         </Td>
                         <Td>
-                          {a.type === 'WALKIN' ? <Badge tone="warning">Walk-in</Badge> : <Badge tone="info">Booked</Badge>}
+                          {a.type === 'WALKIN' ? <Badge tone="warning">{t('appointments.walkin')}</Badge> : <Badge tone="info">{t('appointments.booked')}</Badge>}
                         </Td>
                         <Td>
                           <Badge tone={STATUS_TONE[a.status]} dot>{t(`appointmentStatus.${a.status}`)}</Badge>
@@ -284,14 +284,14 @@ export function AppointmentsPage() {
                                 onClick={() => checkInMut.mutate(a.id)}
                                 className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700"
                               >
-                                <Check size={12} /> Check in
+                                <Check size={12} /> {t('appointments.checkIn')}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => cancelMut.mutate(a.id)}
                                 className="inline-flex items-center gap-1 rounded-md border border-brand-200 bg-white px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50"
                               >
-                                <XIcon size={12} /> Cancel
+                                <XIcon size={12} /> {t('common.cancel')}
                               </button>
                             </div>
                           )}
@@ -347,6 +347,7 @@ function BookingDialog({
   onClose: () => void;
   onBooked: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<PatientResponse | null>(null);
   const [notes, setNotes] = useState('');
@@ -369,14 +370,14 @@ function BookingDialog({
     onSuccess: async (a) => {
       toast.success(
         mode === 'WALKIN'
-          ? `Walk-in queued at ${a.scheduledFor.slice(11, 16)}`
-          : `Booked ${a.scheduledFor.slice(11, 16)}`,
+          ? t('appointments.walkinQueued', { time: a.scheduledFor.slice(11, 16) })
+          : t('appointments.bookedToast', { time: a.scheduledFor.slice(11, 16) }),
       );
       await onBooked();
       onClose();
     },
     onError: (err) => {
-      toast.error(extractApiError(err)?.message ?? 'Booking failed');
+      toast.error(extractApiError(err)?.message ?? t('appointments.bookingFailed'));
     },
   });
 
@@ -386,11 +387,11 @@ function BookingDialog({
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-ink-900">
-              {mode === 'WALKIN' ? 'Walk-in appointment' : 'Book appointment'}
+              {mode === 'WALKIN' ? t('appointments.walkinTitle') : t('appointments.bookTitle')}
             </h2>
             <p className="mt-0.5 text-xs text-ink-500">
               {doctor.fullName}
-              {slot ? ` · ${slot.startsAt.slice(0, 10)} ${slot.startsAt.slice(11, 16)}` : ' · queued at next free slot'}
+              {slot ? ` · ${slot.startsAt.slice(0, 10)} ${slot.startsAt.slice(11, 16)}` : t('appointments.queuedNextSlot')}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1.5 text-ink-500 hover:bg-ink-100">
@@ -408,7 +409,7 @@ function BookingDialog({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search patient by name, MRN, mobile…"
+                  placeholder={t('appointments.searchPatient')}
                   className="h-10 w-full rounded-lg border border-ink-200 bg-white ps-9 pe-3 text-sm placeholder:text-ink-400 focus:border-brand-500"
                 />
               </div>
@@ -442,7 +443,7 @@ function BookingDialog({
                   <div className="font-mono text-[11px] text-ink-500">{picked.mrn}</div>
                 </div>
                 <button type="button" onClick={() => setPicked(null)} className="text-xs text-ink-500 hover:underline">
-                  Change
+                  {t('appointments.change')}
                 </button>
               </div>
             </div>
@@ -450,8 +451,8 @@ function BookingDialog({
 
           {picked && (
             <Input
-              label="Notes (optional)"
-              placeholder="e.g. Follow-up on hypertension"
+              label={t('appointments.notes')}
+              placeholder={t('appointments.notesPlaceholder')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -459,13 +460,13 @@ function BookingDialog({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-ink-100 bg-ink-50/40 px-5 py-3">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             type="button"
             onClick={() => bookMut.mutate()}
             disabled={!picked || bookMut.isPending}
           >
-            {bookMut.isPending ? 'Booking…' : (mode === 'WALKIN' ? 'Queue walk-in' : 'Confirm booking')}
+            {bookMut.isPending ? t('appointments.booking') : (mode === 'WALKIN' ? t('appointments.queueWalkin') : t('appointments.confirmBooking'))}
           </Button>
         </div>
       </div>

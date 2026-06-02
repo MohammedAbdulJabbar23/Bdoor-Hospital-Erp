@@ -137,7 +137,7 @@ export function CatalogueItemDialog({
     },
     onError: (err) => {
       const apiErr = extractApiError(err);
-      toast.error(apiErr?.message ?? 'Save failed');
+      toast.error(apiErr?.message ?? t('catalogues.saveFailed'));
     },
   });
 
@@ -151,10 +151,10 @@ export function CatalogueItemDialog({
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-ink-900">
-              {editing ? `${t('common.edit')} — ${editing.code}` : `${category} · New item`}
+              {editing ? `${t('common.edit')} — ${editing.code}` : t('catalogues.newItemTitle', { category })}
             </h2>
             <p className="mt-0.5 text-xs text-ink-500">
-              {isDrug ? 'Drug catalogue entry' : 'Service catalogue entry'}
+              {isDrug ? t('catalogues.drugEntry') : t('catalogues.serviceEntry')}
             </p>
           </div>
           <button
@@ -170,33 +170,33 @@ export function CatalogueItemDialog({
         <form onSubmit={onSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
-              label="Code *"
+              label={t('catalogues.code')}
               disabled={!!editing}
               error={errors.code && t('common.required')}
               {...register('code')}
             />
-            <Input label="Sort order" type="number" {...register('sortOrder')} />
+            <Input label={t('catalogues.sortOrder')} type="number" {...register('sortOrder')} />
             <Input
-              label="Name (English) *"
+              label={t('catalogues.nameEn')}
               error={errors.nameEn && t('common.required')}
               {...register('nameEn')}
             />
-            <Input label="Name (العربية)" dir="rtl" {...register('nameAr')} />
+            <Input label={t('catalogues.nameAr')} dir="rtl" {...register('nameAr')} />
           </div>
 
-          <Input label="Description" {...register('description')} />
+          <Input label={t('catalogues.fieldDescription')} {...register('description')} />
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input
-              label="Fee"
+              label={t('catalogues.fee')}
               type="number"
               step="0.01"
               disabled={!!forwardTo}
-              hint={forwardTo ? 'Disabled — this item forwards to another department.' : undefined}
+              hint={forwardTo ? t('catalogues.feeDisabledHint') : undefined}
               {...register('fee')}
             />
-            <Input label="Currency" {...register('currency')} />
-            <Select label="Forwards to" {...register('forwardTo')}>
+            <Input label={t('catalogues.currency')} {...register('currency')} />
+            <Select label={t('catalogues.forwardsTo')} {...register('forwardTo')}>
               <option value="">{t('common.none')}</option>
               {CATEGORIES.filter((c) => c !== category).map((c) => (
                 <option key={c} value={c}>
@@ -209,16 +209,16 @@ export function CatalogueItemDialog({
           {isDrug && (
             <div className="rounded-lg border border-ink-100 bg-ink-50/40 p-4">
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
-                Drug details
+                {t('catalogues.drugDetails')}
               </h4>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="Generic name" {...register('drugGenericName')} />
-                <Input label="Dosage form" placeholder="Tablet, Syrup, Injection…" {...register('drugDosageForm')} />
-                <Input label="Strength" placeholder="500mg, 5mg/ml…" {...register('drugStrength')} />
-                <Input label="Unit" placeholder="tablet, vial, bottle…" {...register('drugUnit')} />
+                <Input label={t('catalogues.genericName')} {...register('drugGenericName')} />
+                <Input label={t('catalogues.dosageForm')} placeholder={t('catalogues.dosageFormPlaceholder')} {...register('drugDosageForm')} />
+                <Input label={t('catalogues.strength')} placeholder={t('catalogues.strengthPlaceholder')} {...register('drugStrength')} />
+                <Input label={t('catalogues.unit')} placeholder={t('catalogues.unitPlaceholder')} {...register('drugUnit')} />
                 <label className="flex items-center gap-2 text-sm sm:col-span-2">
                   <input type="checkbox" className="h-4 w-4 rounded accent-brand-600" {...register('drugControlled')} />
-                  Controlled substance
+                  {t('catalogues.controlled')}
                 </label>
               </div>
             </div>

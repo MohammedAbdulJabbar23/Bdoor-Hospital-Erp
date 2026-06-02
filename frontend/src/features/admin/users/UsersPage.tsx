@@ -32,7 +32,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function UsersPage() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -45,12 +45,12 @@ export function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users & roles"
-        description="Create and manage HMS login accounts. Doctor accounts also need a Doctor profile to be linked in /admin/doctors."
+        title={t('users.title')}
+        description={t('users.description')}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus size={14} className="me-1.5" />
-            New user
+            {t('users.newUser')}
           </Button>
         }
       />
@@ -59,17 +59,17 @@ export function UsersPage() {
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
         ) : !users || users.length === 0 ? (
-          <EmptyState icon={UsersIcon} title="No users yet" />
+          <EmptyState icon={UsersIcon} title={t('users.noUsers')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                 <tr>
-                  <Th>User</Th>
-                  <Th>Username</Th>
-                  <Th>Roles</Th>
-                  <Th>Status</Th>
-                  <Th>Created</Th>
+                  <Th>{t('users.colUser')}</Th>
+                  <Th>{t('users.colUsername')}</Th>
+                  <Th>{t('users.colRoles')}</Th>
+                  <Th>{t('users.colStatus')}</Th>
+                  <Th>{t('users.colCreated')}</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
@@ -92,7 +92,7 @@ export function UsersPage() {
                       </div>
                     </Td>
                     <Td>
-                      {u.active ? <Badge tone="success" dot>Active</Badge> : <Badge tone="neutral" dot>Disabled</Badge>}
+                      {u.active ? <Badge tone="success" dot>{t('users.active')}</Badge> : <Badge tone="neutral" dot>{t('users.disabled')}</Badge>}
                     </Td>
                     <Td><span className="text-xs text-ink-700">{dt.format(new Date(u.createdAt))}</span></Td>
                   </tr>
@@ -117,6 +117,7 @@ export function UsersPage() {
 }
 
 function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => Promise<void> }) {
+  const { t } = useTranslation();
   const [selectedRoles, setSelectedRoles] = useState<Set<Role>>(new Set(['RECEPTIONIST']));
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -126,10 +127,10 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
     mutationFn: (values: FormValues) =>
       createUser({ ...values, roles: Array.from(selectedRoles) }),
     onSuccess: async (u) => {
-      toast.success(`User @${u.username} created`);
+      toast.success(t('users.created', { username: u.username }));
       await onCreated();
     },
-    onError: (err) => toast.error(extractApiError(err)?.message ?? 'Create failed'),
+    onError: (err) => toast.error(extractApiError(err)?.message ?? t('users.createFailed')),
   });
 
   const toggleRole = (r: Role) => {
@@ -140,7 +141,7 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
 
   const onSubmit = handleSubmit((v) => {
     if (selectedRoles.size === 0) {
-      toast.error('Pick at least one role');
+      toast.error(t('users.pickRole'));
       return;
     }
     mutation.mutate(v);
@@ -151,8 +152,8 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
       <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-elevated">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-ink-900">New user</h2>
-            <p className="mt-0.5 text-xs text-ink-500">Create a login account and assign roles.</p>
+            <h2 className="text-base font-semibold text-ink-900">{t('users.dialogTitle')}</h2>
+            <p className="mt-0.5 text-xs text-ink-500">{t('users.dialogSubtitle')}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1.5 text-ink-500 hover:bg-ink-100">
             <X size={18} />
@@ -161,16 +162,16 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
 
         <form onSubmit={onSubmit} className="space-y-4 p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input label="Username *" autoComplete="off" error={errors.username && 'Required (3+ chars)'} {...register('username')} />
-            <Input label="Password *" type="text" autoComplete="off" error={errors.password && 'Required (6+ chars)'} {...register('password')} />
+            <Input label={t('users.username')} autoComplete="off" error={errors.username && t('users.usernameError')} {...register('username')} />
+            <Input label={t('users.password')} type="text" autoComplete="off" error={errors.password && t('users.passwordError')} {...register('password')} />
             <div className="sm:col-span-2">
-              <Input label="Full name *" error={errors.fullName && 'Required'} {...register('fullName')} />
+              <Input label={t('users.fullName')} error={errors.fullName && t('users.fullNameError')} {...register('fullName')} />
             </div>
           </div>
 
           <div>
             <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-ink-700">
-              <ShieldCheck size={14} className="text-brand-600" /> Roles
+              <ShieldCheck size={14} className="text-brand-600" /> {t('users.roles')}
             </label>
             <div className="flex flex-wrap gap-2">
               {ALL_ROLES.map((r) => (
@@ -193,9 +194,9 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
         </form>
 
         <div className="flex items-center justify-end gap-2 border-t border-ink-100 bg-ink-50/40 px-5 py-3">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="button" onClick={onSubmit} disabled={mutation.isPending}>
-            {mutation.isPending ? 'Creating…' : 'Create user'}
+            {mutation.isPending ? t('users.creating') : t('users.createUser')}
           </Button>
         </div>
       </div>

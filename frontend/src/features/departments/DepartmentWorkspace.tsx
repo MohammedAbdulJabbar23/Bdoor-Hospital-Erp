@@ -35,14 +35,14 @@ type Config = {
   icon: LucideIcon;
 };
 
-const STATUS_TONE: Record<CaseStatus, { tone: 'neutral'|'info'|'success'|'warning'|'brand'; label: string }> = {
-  NEW:               { tone: 'neutral', label: 'New' },
-  AWAITING_PAYMENT:  { tone: 'warning', label: 'Awaiting payment' },
-  AWAITING_STUDY:    { tone: 'info',    label: 'Awaiting study' },
-  FINDINGS_COMPLETE: { tone: 'brand',   label: 'Findings complete' },
-  CLOSED:            { tone: 'success', label: 'Closed' },
-  RETURNED:          { tone: 'success', label: 'Returned' },
-  CANCELLED:         { tone: 'neutral', label: 'Cancelled' },
+const STATUS_TONE: Record<CaseStatus, 'neutral'|'info'|'success'|'warning'|'brand'> = {
+  NEW:               'neutral',
+  AWAITING_PAYMENT:  'warning',
+  AWAITING_STUDY:    'info',
+  FINDINGS_COMPLETE: 'brand',
+  CLOSED:            'success',
+  RETURNED:          'success',
+  CANCELLED:         'neutral',
 };
 
 /** Terminal/closed statuses excluded by the default "active only" view. */
@@ -121,8 +121,8 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
                   <ListOrdered size={16} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-semibold text-ink-900">Incoming — open a case</h3>
-                  <p className="text-xs text-ink-500">{visitsWithoutCase.length} visit{visitsWithoutCase.length === 1 ? '' : 's'} waiting for service selection</p>
+                  <h3 className="text-sm font-semibold text-ink-900">{t('deptWorkspace.incomingTitle')}</h3>
+                  <p className="text-xs text-ink-500">{t('deptWorkspace.incomingWaiting', { count: visitsWithoutCase.length })}</p>
                 </div>
               </div>
               <ul className="divide-y divide-ink-100">
@@ -188,12 +188,12 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
                 <table className="w-full text-sm">
                   <thead className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     <tr>
-                      <Th>Visit</Th>
-                      <Th>Patient</Th>
-                      <Th>Origin</Th>
-                      <Th>Services</Th>
-                      <Th>Status</Th>
-                      <Th className="text-end">Actions</Th>
+                      <Th>{t('deptWorkspace.colVisit')}</Th>
+                      <Th>{t('deptWorkspace.colPatient')}</Th>
+                      <Th>{t('deptWorkspace.colOrigin')}</Th>
+                      <Th>{t('deptWorkspace.colServices')}</Th>
+                      <Th>{t('deptWorkspace.colStatus')}</Th>
+                      <Th className="text-end">{t('common.actions')}</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
@@ -218,7 +218,7 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
                           </div>
                         </Td>
                         <Td>
-                          <Badge tone={STATUS_TONE[c.status].tone} dot>{STATUS_TONE[c.status].label}</Badge>
+                          <Badge tone={STATUS_TONE[c.status]} dot>{t(`deptWorkspace.caseStatus.${c.status}`)}</Badge>
                         </Td>
                         <Td className="text-end">
                           <button
@@ -410,6 +410,7 @@ function CaseDetail({
   onBack: () => void;
   onChange: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { data: deptCase, isLoading } = useQuery({
     queryKey: ['dept-case', caseId],
     queryFn: async () => (await import('./api')).getCase(caseId),
@@ -446,7 +447,7 @@ function CaseDetail({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm font-semibold text-ink-900">{deptCase.visitDisplayId}</span>
-              <Badge tone={STATUS_TONE[deptCase.status].tone} dot>{STATUS_TONE[deptCase.status].label}</Badge>
+              <Badge tone={STATUS_TONE[deptCase.status]} dot>{t(`deptWorkspace.caseStatus.${deptCase.status}`)}</Badge>
               {deptCase.visitOrigin === 'FORWARDED' && <Badge tone="warning">forwarded</Badge>}
             </div>
             <div className="mt-1 font-medium text-ink-900">{deptCase.patientName}</div>

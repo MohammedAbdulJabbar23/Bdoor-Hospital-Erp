@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -134,7 +135,7 @@ export function PatientProfilePage() {
   if (patientLoading || !patient) {
     return (
       <>
-        <PageHeader title="Patient profile" />
+        <PageHeader title={t('patientProfile.profile')} />
         <div className="space-y-4"><Skeleton className="h-32" /><Skeleton className="h-64" /></div>
       </>
     );
@@ -146,7 +147,7 @@ export function PatientProfilePage() {
     <div className="space-y-4">
       <div className="print-hide flex items-center justify-between">
         <Link to="/reception/patients" className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900">
-          <ArrowLeft size={12} className="rtl:rotate-180" /> Patients
+          <ArrowLeft size={12} className="rtl:rotate-180" /> {t('patientProfile.patients')}
         </Link>
         <div className="flex items-center gap-2">
           <Button
@@ -169,7 +170,7 @@ export function PatientProfilePage() {
             {patient.vip ? t('patient.removeVip') : t('patient.markVip')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
-            <Printer size={14} className="me-1.5" /> Print profile
+            <Printer size={14} className="me-1.5" /> {t('patientProfile.printProfile')}
           </Button>
           <Button
             variant="secondary"
@@ -191,8 +192,8 @@ export function PatientProfilePage() {
         <Card>
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
             <div>
-              <h3 className="text-sm font-semibold text-ink-900">Start a new visit</h3>
-              <p className="text-xs text-ink-500">Direct walk-in for non-doctor departments. For doctor consultations, use the Appointments page.</p>
+              <h3 className="text-sm font-semibold text-ink-900">{t('patientProfile.startVisitTitle')}</h3>
+              <p className="text-xs text-ink-500">{t('patientProfile.startVisitHint')}</p>
             </div>
             <button type="button" onClick={() => setStartVisitOpen(false)} className="rounded-md p-1.5 text-ink-500 hover:bg-ink-100">
               <XIcon size={16} />
@@ -219,8 +220,8 @@ export function PatientProfilePage() {
       )}
 
       <div className="print-only">
-        <h1 className="text-2xl font-bold">Patient Summary — Albudoor Hospital</h1>
-        <p className="mt-1 text-xs">Generated {new Date().toLocaleString()}</p>
+        <h1 className="text-2xl font-bold">{t('patientProfile.summaryTitle')}</h1>
+        <p className="mt-1 text-xs">{t('patientProfile.generated', { when: new Date().toLocaleString() })}</p>
       </div>
 
       {/* ----- HEADER STRIP ----- */}
@@ -234,15 +235,15 @@ export function PatientProfilePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{patient.fullName}</h1>
                 {patient.vip && <Badge tone="brand"><Crown size={11} className="me-0.5" />VIP</Badge>}
-                {patient.archived && <Badge tone="neutral">Archived</Badge>}
-                <Badge tone={patient.type === 'INFANT' ? 'warning' : 'info'}>{patient.type === 'INFANT' ? 'Infant' : 'Adult'}</Badge>
+                {patient.archived && <Badge tone="neutral">{t('patientProfile.archived')}</Badge>}
+                <Badge tone={patient.type === 'INFANT' ? 'warning' : 'info'}>{patient.type === 'INFANT' ? t('patientProfile.infant') : t('patientProfile.adult')}</Badge>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <KV icon={IdCard} label="MRN"><span className="font-mono">{patient.mrn}</span></KV>
-                <KV label="Gender">{patient.gender === 'MALE' ? 'Male' : 'Female'}</KV>
-                <KV icon={Calendar} label="DOB">{dt.format(new Date(patient.dateOfBirth))} <span className="text-ink-500">· {age}</span></KV>
-                {patient.adult?.mobileNumber && <KV icon={Phone} label="Mobile"><span className="font-mono">{patient.adult.mobileNumber}</span></KV>}
-                {patient.adult?.nationalId && <KV label="National ID"><span className="font-mono">{patient.adult.nationalId}</span></KV>}
+                <KV icon={IdCard} label={t('patientProfile.mrn')}><span className="font-mono">{patient.mrn}</span></KV>
+                <KV label={t('patientProfile.gender')}>{patient.gender === 'MALE' ? t('patientProfile.male') : t('patientProfile.female')}</KV>
+                <KV icon={Calendar} label={t('patientProfile.dob')}>{dt.format(new Date(patient.dateOfBirth))} <span className="text-ink-500">· {age}</span></KV>
+                {patient.adult?.mobileNumber && <KV icon={Phone} label={t('patientProfile.mobile')}><span className="font-mono">{patient.adult.mobileNumber}</span></KV>}
+                {patient.adult?.nationalId && <KV label={t('patientProfile.nationalId')}><span className="font-mono">{patient.adult.nationalId}</span></KV>}
               </div>
               {patient.adult?.address && (
                 <div className="mt-1 inline-flex items-center gap-1 text-xs text-ink-500">
@@ -253,12 +254,12 @@ export function PatientProfilePage() {
           </div>
           <div className="flex flex-col items-end gap-2 text-end">
             <div className="text-2xl font-semibold text-ink-900">{history?.totalVisits ?? 0}</div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-500">Total visits</div>
+            <div className="text-[11px] uppercase tracking-wide text-ink-500">{t('patientProfile.totalVisits')}</div>
           </div>
         </div>
         {patient.adult?.emergencyContactName && (
           <div className="border-t border-ink-100 px-5 py-3 text-xs">
-            <span className="font-semibold uppercase tracking-wide text-ink-500">Emergency contact:</span>
+            <span className="font-semibold uppercase tracking-wide text-ink-500">{t('patientProfile.emergencyContact')}</span>
             <span className="ms-2 text-ink-700">{patient.adult.emergencyContactName}</span>
             {patient.adult.emergencyContactMobile && <span className="ms-2 font-mono text-ink-500">{patient.adult.emergencyContactMobile}</span>}
           </div>
@@ -269,18 +270,18 @@ export function PatientProfilePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <SummaryTile
           icon={ClipboardList} tone="brand"
-          label="Active problems" value={problems.length}
-          hint={problems.filter((p) => p.chronic).length > 0 ? `${problems.filter((p) => p.chronic).length} recurring` : undefined}
+          label={t('patientProfile.activeProblems')} value={problems.length}
+          hint={problems.filter((p) => p.chronic).length > 0 ? t('patientProfile.recurring', { count: problems.filter((p) => p.chronic).length }) : undefined}
         />
         <SummaryTile
           icon={Pill} tone="info"
-          label="Active medications" value={activeMeds.length}
-          hint={activeMeds.length > 0 ? `Last Rx ${relativeDate(activeMeds[0].prescribedAt)}` : undefined}
+          label={t('patientProfile.activeMedications')} value={activeMeds.length}
+          hint={activeMeds.length > 0 ? t('patientProfile.lastRx', { when: relativeDate(activeMeds[0].prescribedAt, t) }) : undefined}
         />
         <SummaryTile
           icon={Activity} tone="success"
-          label="Recorded vitals" value={trend.length}
-          hint={trend[0] ? `Last ${relativeDate(trend[0].recordedAt)}` : undefined}
+          label={t('patientProfile.recordedVitals')} value={trend.length}
+          hint={trend[0] ? t('patientProfile.last', { when: relativeDate(trend[0].recordedAt, t) }) : undefined}
         />
       </div>
 
@@ -316,6 +317,7 @@ function VisitsTimelineCard({
   dt: Intl.DateTimeFormat;
   dtt: Intl.DateTimeFormat;
 }) {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<VisitTypeFilter>('ALL');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -333,9 +335,9 @@ function VisitsTimelineCard({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 print-hide">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-            <Calendar size={14} className="text-brand-600" /> Visit timeline
+            <Calendar size={14} className="text-brand-600" /> {t('patientProfile.visitTimeline')}
           </h3>
-          <p className="text-xs text-ink-500">All encounters, newest first. Click a row to expand.</p>
+          <p className="text-xs text-ink-500">{t('patientProfile.visitTimelineHint')}</p>
         </div>
       </div>
 
@@ -346,7 +348,7 @@ function VisitsTimelineCard({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search complaints, diagnoses, drugs, visit ID, doctor…"
+            placeholder={t('patientProfile.searchPlaceholder')}
             className="h-9 w-full rounded-lg border border-ink-200 bg-white ps-9 pe-8 text-sm placeholder:text-ink-400 focus:border-brand-500"
           />
           {query && (
@@ -354,14 +356,14 @@ function VisitsTimelineCard({
               type="button"
               onClick={() => setQuery('')}
               className="absolute end-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-              aria-label="Clear search"
+              aria-label={t('patientProfile.clearSearch')}
             >
               <XIcon size={12} />
             </button>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-medium text-ink-600">Filter:</span>
+          <span className="font-medium text-ink-600">{t('patientProfile.filter')}</span>
           {(['ALL', 'DOCTOR_APPOINTMENT', 'LABORATORY', 'RADIOLOGY', 'ECO', 'EMERGENCY', 'PREMATURE'] as VisitTypeFilter[]).map((f) => (
             <button
               key={f} type="button" onClick={() => setFilter(f)}
@@ -370,12 +372,12 @@ function VisitsTimelineCard({
                 filter === f ? 'bg-brand-600 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-50'
               )}
             >
-              {f === 'ALL' ? 'All' : TYPE_LABEL[f]}
+              {f === 'ALL' ? t('common.all') : TYPE_LABEL[f]}
             </button>
           ))}
           {(query || filter !== 'ALL') && (
             <span className="ms-auto text-ink-500">
-              {entries.length} result{entries.length === 1 ? '' : 's'}
+              {t('patientProfile.resultCount', { count: entries.length })}
             </span>
           )}
         </div>
@@ -387,12 +389,12 @@ function VisitsTimelineCard({
         <div className="px-5 py-10 text-center">
           <Inbox size={28} className="mx-auto text-ink-300" />
           <p className="mt-2 text-sm text-ink-600">
-            {history?.entries.length === 0 ? 'No visits recorded yet.' :
-              query ? `No visits match “${query}”.` : 'No visits match this filter.'}
+            {history?.entries.length === 0 ? t('patientProfile.noVisits') :
+              query ? t('patientProfile.noVisitsMatchQuery', { query }) : t('patientProfile.noVisitsMatchFilter')}
           </p>
           {(query || filter !== 'ALL') && (
             <button type="button" onClick={() => { setQuery(''); setFilter('ALL'); }} className="mt-2 text-xs font-medium text-brand-700 hover:underline">
-              Clear filters
+              {t('patientProfile.clearFilters')}
             </button>
           )}
         </div>
@@ -421,6 +423,7 @@ function TimelineRow({
   dt: Intl.DateTimeFormat;
   dtt: Intl.DateTimeFormat;
 }) {
+  const { t } = useTranslation();
   const Icon = TYPE_ICON[entry.visitType] ?? Calendar;
   const tone = statusTone(entry.status);
   const hasExam = entry.exam != null;
@@ -438,14 +441,14 @@ function TimelineRow({
               <Icon size={14} className="text-ink-500" />
               <span className="font-medium text-ink-900">{TYPE_LABEL[entry.visitType] ?? entry.visitType}</span>
               {entry.parentVisitId && (
-                <Badge tone="warning">forwarded</Badge>
+                <Badge tone="warning">{t('patientProfile.forwarded')}</Badge>
               )}
               <Badge tone={tone}>{entry.status.replace(/_/g, ' ')}</Badge>
             </div>
             <div className="mt-0.5 font-mono text-[11px] text-ink-500">{entry.visitDisplayId}</div>
             {hasExam && entry.exam!.diagnoses.length > 0 && (
               <div className="mt-1 truncate text-xs text-ink-700">
-                <span className="font-semibold">Dx:</span>{' '}
+                <span className="font-semibold">{t('patientProfile.dx')}</span>{' '}
                 {entry.exam!.diagnoses.find((d) => d.primary)?.description ?? entry.exam!.diagnoses[0].description}
                 {entry.exam!.diagnoses.length > 1 && <span className="ms-1 text-ink-500">+{entry.exam!.diagnoses.length - 1}</span>}
               </div>
@@ -467,12 +470,12 @@ function TimelineRow({
         <div className="ms-3 mt-2 space-y-3 rounded-lg border border-ink-200 bg-white p-3">
           <div className="flex items-center justify-between">
             <div className="text-xs">
-              <span className="text-ink-500">Started</span>{' '}
+              <span className="text-ink-500">{t('patientProfile.started')}</span>{' '}
               <span className="font-mono">{dtt.format(new Date(entry.startedAt))}</span>
-              {entry.endedAt && <>{' · '}<span className="text-ink-500">Ended</span> <span className="font-mono">{dtt.format(new Date(entry.endedAt))}</span></>}
+              {entry.endedAt && <>{' · '}<span className="text-ink-500">{t('patientProfile.ended')}</span> <span className="font-mono">{dtt.format(new Date(entry.endedAt))}</span></>}
             </div>
             <Link to={`/clinical/exam/${entry.visitId}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
-              Open exam <ChevronRight size={12} className="rtl:rotate-180" />
+              {t('patientProfile.openExam')} <ChevronRight size={12} className="rtl:rotate-180" />
             </Link>
           </div>
 
@@ -483,7 +486,7 @@ function TimelineRow({
             <div className="rounded bg-ink-50 p-2 font-mono text-[11px] whitespace-pre-line text-ink-700">{entry.resultsSummary}</div>
           )}
           {!hasExam && !entry.resultsSummary && (
-            <p className="text-xs text-ink-500">No clinical detail recorded for this visit.</p>
+            <p className="text-xs text-ink-500">{t('patientProfile.noDetail')}</p>
           )}
         </div>
       )}
@@ -492,37 +495,38 @@ function TimelineRow({
 }
 
 function ExamDetailsBlock({ exam }: { exam: NonNullable<HistoryEntry['exam']> }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2 text-sm">
       {exam.chiefComplaint && (
-        <Detail label="Chief complaint">{exam.chiefComplaint}</Detail>
+        <Detail label={t('patientProfile.chiefComplaint')}>{exam.chiefComplaint}</Detail>
       )}
       {exam.historyOfPresentIllness && (
-        <Detail label="History of present illness">{exam.historyOfPresentIllness}</Detail>
+        <Detail label={t('patientProfile.hpi')}>{exam.historyOfPresentIllness}</Detail>
       )}
       {exam.examinationNotes && (
-        <Detail label="Examination">{exam.examinationNotes}</Detail>
+        <Detail label={t('patientProfile.examination')}>{exam.examinationNotes}</Detail>
       )}
       {hasAnyVital(exam.vitals) && (
-        <Detail label="Vitals">
+        <Detail label={t('patientProfile.vitals')}>
           <VitalsLine v={exam.vitals} />
         </Detail>
       )}
       {exam.diagnoses.length > 0 && (
-        <Detail label="Diagnoses">
+        <Detail label={t('patientProfile.diagnoses')}>
           <ul className="list-inside list-disc">
             {exam.diagnoses.map((d, i) => (
               <li key={i} className="text-ink-800">
                 {d.code && <span className="me-1 font-mono text-[11px] text-ink-500">{d.code}</span>}
                 {d.description}
-                {d.primary && <span className="ms-1 text-brand-600">★ primary</span>}
+                {d.primary && <span className="ms-1 text-brand-600">{t('patientProfile.primary')}</span>}
               </li>
             ))}
           </ul>
         </Detail>
       )}
       {exam.prescriptions.length > 0 && (
-        <Detail label="Prescriptions">
+        <Detail label={t('patientProfile.prescriptions')}>
           <ul className="list-inside list-disc">
             {exam.prescriptions.map((p, i) => (
               <li key={i} className="text-ink-800">
@@ -536,8 +540,8 @@ function ExamDetailsBlock({ exam }: { exam: NonNullable<HistoryEntry['exam']> })
           </ul>
         </Detail>
       )}
-      {exam.plan && <Detail label="Plan">{exam.plan}</Detail>}
-      {exam.referralInstructions && <Detail label="Referral">{exam.referralInstructions}</Detail>}
+      {exam.plan && <Detail label={t('patientProfile.plan')}>{exam.plan}</Detail>}
+      {exam.referralInstructions && <Detail label={t('patientProfile.referral')}>{exam.referralInstructions}</Detail>}
     </div>
   );
 }
@@ -567,11 +571,12 @@ function VitalsLine({ v }: { v: Vitals }) {
 /* ============================================================== Right rail panels ============================================================== */
 
 function ProblemListCard({ problems, dt }: { problems: ReturnType<typeof deriveProblemList>; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   return (
     <Card>
-      <PanelHead icon={ClipboardList} title="Problem list" subtitle={`${problems.length} unique diagnoses`} />
+      <PanelHead icon={ClipboardList} title={t('patientProfile.problemList')} subtitle={t('patientProfile.problemListSubtitle', { count: problems.length })} />
       {problems.length === 0 ? (
-        <p className="px-5 pb-4 text-xs text-ink-500">None recorded.</p>
+        <p className="px-5 pb-4 text-xs text-ink-500">{t('patientProfile.noneRecorded')}</p>
       ) : (
         <ul className="divide-y divide-ink-100">
           {problems.slice(0, 12).map((p) => (
@@ -581,13 +586,13 @@ function ProblemListCard({ problems, dt }: { problems: ReturnType<typeof deriveP
                   <div className="flex items-center gap-2">
                     {p.code && <span className="font-mono text-[10px] text-ink-500">{p.code}</span>}
                     <span className="font-medium text-ink-900">{p.description}</span>
-                    {p.chronic && <Badge tone="warning">recurring</Badge>}
-                    {p.primaryCount > 0 && <span className="text-brand-600" title="Was primary diagnosis">★</span>}
+                    {p.chronic && <Badge tone="warning">{t('patientProfile.recurringBadge')}</Badge>}
+                    {p.primaryCount > 0 && <span className="text-brand-600" title={t('patientProfile.wasPrimary')}>★</span>}
                   </div>
                   <div className="mt-0.5 text-[11px] text-ink-500">
-                    First seen {dt.format(new Date(p.firstSeen))}
-                    {p.firstSeen !== p.lastSeen && <> · last {dt.format(new Date(p.lastSeen))}</>}
-                    {p.occurrences > 1 && <> · {p.occurrences} visits</>}
+                    {t('patientProfile.firstSeen', { when: dt.format(new Date(p.firstSeen)) })}
+                    {p.firstSeen !== p.lastSeen && t('patientProfile.lastSeen', { when: dt.format(new Date(p.lastSeen)) })}
+                    {p.occurrences > 1 && t('patientProfile.visitsCount', { count: p.occurrences })}
                   </div>
                 </div>
               </div>
@@ -600,11 +605,12 @@ function ProblemListCard({ problems, dt }: { problems: ReturnType<typeof deriveP
 }
 
 function ActiveMedicationsCard({ meds, dt }: { meds: ReturnType<typeof deriveActiveMedications>; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   return (
     <Card>
-      <PanelHead icon={Pill} title="Active medications" subtitle={`${meds.length} most-recent prescriptions per drug`} />
+      <PanelHead icon={Pill} title={t('patientProfile.activeMedications')} subtitle={t('patientProfile.activeMedsSubtitle', { count: meds.length })} />
       {meds.length === 0 ? (
-        <p className="px-5 pb-4 text-xs text-ink-500">No medications on record.</p>
+        <p className="px-5 pb-4 text-xs text-ink-500">{t('patientProfile.noMeds')}</p>
       ) : (
         <ul className="divide-y divide-ink-100">
           {meds.slice(0, 10).map((m, i) => (
@@ -615,7 +621,7 @@ function ActiveMedicationsCard({ meds, dt }: { meds: ReturnType<typeof deriveAct
                 {m.route && <span className="ms-1 text-ink-500">({m.route})</span>}
               </div>
               <div className="mt-0.5 text-[11px] text-ink-500">
-                Prescribed {dt.format(new Date(m.prescribedAt))} · {m.prescribedByDoctor} · <span className="font-mono">{m.prescribedByVisit}</span>
+                {t('patientProfile.prescribed', { when: dt.format(new Date(m.prescribedAt)) })} · {m.prescribedByDoctor} · <span className="font-mono">{m.prescribedByVisit}</span>
               </div>
             </li>
           ))}
@@ -626,13 +632,14 @@ function ActiveMedicationsCard({ meds, dt }: { meds: ReturnType<typeof deriveAct
 }
 
 function VitalsTrendCard({ trend, dt }: { trend: ReturnType<typeof deriveVitalsTrend>; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   // Reverse to chronological for sparklines (left → right = older → newer)
   const chrono = useMemo(() => [...trend].reverse(), [trend]);
   if (trend.length === 0) {
     return (
       <Card>
-        <PanelHead icon={TrendingUp} title="Vitals trend" />
-        <p className="px-5 pb-4 text-xs text-ink-500">No vitals recorded.</p>
+        <PanelHead icon={TrendingUp} title={t('patientProfile.vitalsTrend')} />
+        <p className="px-5 pb-4 text-xs text-ink-500">{t('patientProfile.noVitals')}</p>
       </Card>
     );
   }
@@ -647,7 +654,7 @@ function VitalsTrendCard({ trend, dt }: { trend: ReturnType<typeof deriveVitalsT
   const last = trend[0].vitals;
   return (
     <Card>
-      <PanelHead icon={TrendingUp} title="Vitals trend" subtitle={`${trend.length} recording${trend.length === 1 ? '' : 's'} · ${dt.format(new Date(trend[0].recordedAt))}`} />
+      <PanelHead icon={TrendingUp} title={t('patientProfile.vitalsTrend')} subtitle={t('patientProfile.vitalsTrendSubtitle', { count: trend.length, when: dt.format(new Date(trend[0].recordedAt)) })} />
       <div className="grid grid-cols-2 gap-px bg-ink-100">
         <SparklineTile
           label="BP"
@@ -696,12 +703,12 @@ function VitalsTrendCard({ trend, dt }: { trend: ReturnType<typeof deriveVitalsT
         />
       </div>
       <details className="border-t border-ink-100 px-5 py-2 text-xs">
-        <summary className="cursor-pointer select-none text-ink-600">Show all measurements</summary>
+        <summary className="cursor-pointer select-none text-ink-600">{t('patientProfile.showAllMeasurements')}</summary>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
               <tr>
-                <th className="px-2 py-1 text-start">Date</th>
+                <th className="px-2 py-1 text-start">{t('patientProfile.colDate')}</th>
                 <th className="px-2 py-1 text-end">BP</th>
                 <th className="px-2 py-1 text-end">HR</th>
                 <th className="px-2 py-1 text-end">T°</th>
@@ -758,9 +765,10 @@ function SparklineTile({
 }
 
 function ActiveOrdersCard({ orders, dt }: { orders: HistoryEntry[]; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   return (
     <Card>
-      <PanelHead icon={Activity} title="Active orders" subtitle={`${orders.length} in flight across all visits`} />
+      <PanelHead icon={Activity} title={t('patientProfile.activeOrders')} subtitle={t('patientProfile.activeOrdersSubtitle', { count: orders.length })} />
       <ul className="divide-y divide-ink-100">
         {orders.map((o) => {
           const Icon = TYPE_ICON[o.visitType] ?? FileText;
@@ -776,7 +784,7 @@ function ActiveOrdersCard({ orders, dt }: { orders: HistoryEntry[]; dt: Intl.Dat
                   <div className="font-mono text-[11px] text-ink-500">{o.visitDisplayId} · started {dt.format(new Date(o.startedAt))}</div>
                 </div>
                 <Link to={`/clinical/exam/${o.parentVisitId}`} className="text-[11px] font-medium text-brand-700 hover:underline">
-                  parent visit
+                  {t('patientProfile.parentVisit')}
                 </Link>
               </div>
             </li>
@@ -836,9 +844,10 @@ function entryMatches(e: HistoryEntry, q: string): boolean {
 }
 
 function RecentResultsCard({ results, dt }: { results: ReturnType<typeof deriveRecentResults>; dt: Intl.DateTimeFormat }) {
+  const { t } = useTranslation();
   return (
     <Card>
-      <PanelHead icon={FileText} title="Recent results" subtitle="Returned from forwarded visits" />
+      <PanelHead icon={FileText} title={t('patientProfile.recentResults')} subtitle={t('patientProfile.recentResultsSubtitle')} />
       <ul className="divide-y divide-ink-100">
         {results.map((r) => {
           const Icon = TYPE_ICON[r.visitType] ?? FileText;
@@ -947,11 +956,11 @@ function computeAge(dob: string): string {
   return `${years}y`;
 }
 
-function relativeDate(iso: string): string {
+function relativeDate(iso: string, t: TFunction): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (days === 0) return t('patientProfile.today');
+  if (days === 1) return t('patientProfile.yesterday');
+  if (days < 30) return t('patientProfile.daysAgo', { count: days });
+  if (days < 365) return t('patientProfile.monthsAgo', { count: Math.floor(days / 30) });
+  return t('patientProfile.yearsAgo', { count: Math.floor(days / 365) });
 }

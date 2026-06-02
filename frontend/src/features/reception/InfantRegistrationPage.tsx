@@ -64,13 +64,13 @@ export function InfantRegistrationPage() {
   const mutation = useMutation({
     mutationFn: (body: RegisterInfantBody) => registerInfant(body),
     onSuccess: async (saved) => {
-      toast.success(`Infant ${saved.mrn} registered`);
+      toast.success(t('infant.registered', { mrn: saved.mrn }));
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
       navigate(`/reception/patients?highlight=${saved.id}`);
     },
     onError: (err) => {
       const apiErr = extractApiError(err);
-      toast.error(`Could not register infant: ${apiErr?.message ?? 'Failed'}`);
+      toast.error(t('infant.error', { message: apiErr?.message ?? t('infant.failed') }));
     },
   });
 
@@ -84,8 +84,8 @@ export function InfantRegistrationPage() {
   return (
     <>
       <PageHeader
-        title="Register infant"
-        description="Newborn intake — distinct from adult registration. No national ID required at birth; mother MRN, Apgar, and delivery details are captured."
+        title={t('infant.title')}
+        description={t('infant.description')}
         actions={
           <Link to="/reception/patients">
             <Button variant="ghost" size="md">
@@ -99,86 +99,86 @@ export function InfantRegistrationPage() {
       <form onSubmit={onSubmit} className="space-y-5 pb-24">
         <Card>
           <CardBody className="p-6">
-            <SectionHeader icon={Baby} title="Newborn identity" />
+            <SectionHeader icon={Baby} title={t('infant.sectionIdentity')} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Full name (optional — defaults to ‘Baby <family>’)" {...register('fullName')} />
-              <Select label="Gender" {...register('gender')}>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
+              <Input label={t('infant.fullName')} {...register('fullName')} />
+              <Select label={t('infant.gender')} {...register('gender')}>
+                <option value="MALE">{t('infant.male')}</option>
+                <option value="FEMALE">{t('infant.female')}</option>
               </Select>
               <Input
-                label={<>Date of birth <span className="text-brand-600">*</span></>}
+                label={<>{t('infant.dob')} <span className="text-brand-600">*</span></>}
                 type="date"
-                error={errors.dateOfBirth && 'Required'}
+                error={errors.dateOfBirth && t('infant.required')}
                 {...register('dateOfBirth')}
               />
-              <Input label="Time of birth (optional)" type="time" {...register('dobTime')} />
+              <Input label={t('infant.dobTime')} type="time" {...register('dobTime')} />
             </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardBody className="p-6">
-            <SectionHeader icon={HeartPulse} title="Delivery details" />
+            <SectionHeader icon={HeartPulse} title={t('infant.sectionDelivery')} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Select label="Place of birth" {...register('placeOfBirth')}>
-                <option value="THIS_HOSPITAL">This hospital</option>
-                <option value="OUTSIDE">Outside</option>
-                <option value="OTHER">Other</option>
+              <Select label={t('infant.placeOfBirth')} {...register('placeOfBirth')}>
+                <option value="THIS_HOSPITAL">{t('infant.placeThisHospital')}</option>
+                <option value="OUTSIDE">{t('infant.placeOutside')}</option>
+                <option value="OTHER">{t('infant.placeOther')}</option>
               </Select>
-              <Select label="Delivery type" {...register('deliveryType')}>
-                <option value="VAGINAL">Vaginal</option>
-                <option value="C_SECTION">C-section</option>
-                <option value="ASSISTED">Assisted</option>
+              <Select label={t('infant.deliveryType')} {...register('deliveryType')}>
+                <option value="VAGINAL">{t('infant.deliveryVaginal')}</option>
+                <option value="C_SECTION">{t('infant.deliveryCSection')}</option>
+                <option value="ASSISTED">{t('infant.deliveryAssisted')}</option>
               </Select>
-              <Input label="Gestational age (weeks)" type="number" min={20} {...register('gestationalAgeWeeks')} />
-              <Input label="Gestational age (days)" type="number" min={0} max={6} {...register('gestationalAgeDays')} />
-              <Input label="Apgar (1 min)" type="number" min={0} max={10} {...register('apgar1Min')} />
-              <Input label="Apgar (5 min)" type="number" min={0} max={10} {...register('apgar5Min')} />
-              <Input label="Birth weight (kg)" {...register('birthWeightKg')} />
-              <Input label="Length (cm)" {...register('lengthCm')} />
-              <Input label="Head circumference (cm)" {...register('ofcCm')} />
+              <Input label={t('infant.gaWeeks')} type="number" min={20} {...register('gestationalAgeWeeks')} />
+              <Input label={t('infant.gaDays')} type="number" min={0} max={6} {...register('gestationalAgeDays')} />
+              <Input label={t('infant.apgar1')} type="number" min={0} max={10} {...register('apgar1Min')} />
+              <Input label={t('infant.apgar5')} type="number" min={0} max={10} {...register('apgar5Min')} />
+              <Input label={t('infant.birthWeight')} {...register('birthWeightKg')} />
+              <Input label={t('infant.length')} {...register('lengthCm')} />
+              <Input label={t('infant.ofc')} {...register('ofcCm')} />
             </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardBody className="p-6">
-            <SectionHeader icon={ShieldAlert} title="Parents" description="Link to mother's MRN if already registered, otherwise capture details." />
+            <SectionHeader icon={ShieldAlert} title={t('infant.sectionParents')} description={t('infant.parentsHint')} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Mother's name" {...register('motherName')} />
-              <Input label="Mother's mobile" {...register('motherMobile')} />
-              <Input label="Mother's national ID" {...register('motherNationalId')} />
-              <Input label="Father's name" {...register('fatherName')} />
-              <Input label="Father's mobile" {...register('fatherMobile')} />
+              <Input label={t('infant.motherName')} {...register('motherName')} />
+              <Input label={t('infant.motherMobile')} {...register('motherMobile')} />
+              <Input label={t('infant.motherNationalId')} {...register('motherNationalId')} />
+              <Input label={t('infant.fatherName')} {...register('fatherName')} />
+              <Input label={t('infant.fatherMobile')} {...register('fatherMobile')} />
             </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardBody className="p-6">
-            <SectionHeader icon={ShieldAlert} title="Legal guardian (required)" />
+            <SectionHeader icon={ShieldAlert} title={t('infant.sectionGuardian')} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
-                label={<>Guardian name <span className="text-brand-600">*</span></>}
-                error={errors.guardianName && 'Required'}
+                label={<>{t('infant.guardianName')} <span className="text-brand-600">*</span></>}
+                error={errors.guardianName && t('infant.required')}
                 {...register('guardianName')}
               />
-              <Input label="Relationship to infant" placeholder="e.g. Mother, Father, Grandparent" {...register('guardianRelationship')} />
-              <Input label="Guardian mobile" {...register('guardianMobile')} />
-              <Input label="Guardian national ID" {...register('guardianNationalId')} />
+              <Input label={t('infant.guardianRelationship')} placeholder={t('infant.guardianRelationshipPlaceholder')} {...register('guardianRelationship')} />
+              <Input label={t('infant.guardianMobile')} {...register('guardianMobile')} />
+              <Input label={t('infant.guardianNationalId')} {...register('guardianNationalId')} />
             </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardBody className="p-6">
-            <SectionHeader icon={Crown} title="Flags" />
+            <SectionHeader icon={Crown} title={t('infant.sectionFlags')} />
             <label className="flex items-start gap-3 rounded-lg border border-brand-100 bg-brand-50/50 p-4 transition-colors hover:border-brand-200">
               <input type="checkbox" className="mt-0.5 h-4 w-4 rounded accent-brand-600" {...register('vip')} />
               <div>
-                <div className="text-sm font-medium text-ink-900">VIP — bypass all payments</div>
-                <div className="mt-0.5 text-xs text-ink-500">When set, all cashier steps are auto-approved for this infant.</div>
+                <div className="text-sm font-medium text-ink-900">{t('infant.vip')}</div>
+                <div className="mt-0.5 text-xs text-ink-500">{t('infant.vipHint')}</div>
               </div>
             </label>
           </CardBody>
@@ -191,7 +191,7 @@ export function InfantRegistrationPage() {
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               <Baby size={14} className="me-1.5" />
-              {mutation.isPending ? t('common.loading') : 'Register infant'}
+              {mutation.isPending ? t('common.loading') : t('infant.register')}
             </Button>
           </div>
         </div>

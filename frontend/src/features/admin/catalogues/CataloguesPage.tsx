@@ -31,16 +31,16 @@ import {
 } from './api';
 import { CatalogueItemDialog } from './CatalogueItemDialog';
 
-const TABS: { category: ServiceCategory; label: string; icon: LucideIcon }[] = [
-  { category: 'LAB',       label: 'Laboratory',  icon: FlaskConical },
-  { category: 'IMAGING',   label: 'Radiology',   icon: Scan         },
-  { category: 'ECO',       label: 'ECO',         icon: HeartPulse   },
-  { category: 'EMERGENCY', label: 'Emergency',   icon: Siren        },
-  { category: 'DRUG',      label: 'Pharmacy',    icon: Pill         },
+const TABS: { category: ServiceCategory; icon: LucideIcon }[] = [
+  { category: 'LAB',       icon: FlaskConical },
+  { category: 'IMAGING',   icon: Scan         },
+  { category: 'ECO',       icon: HeartPulse   },
+  { category: 'EMERGENCY', icon: Siren        },
+  { category: 'DRUG',      icon: Pill         },
 ];
 
 export function CataloguesPage() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [active, setActive] = useState<ServiceCategory>('LAB');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
@@ -54,14 +54,14 @@ export function CataloguesPage() {
   const archiveMut = useMutation({
     mutationFn: (id: string) => archiveItem(id),
     onSuccess: async () => {
-      toast.success('Archived');
+      toast.success(t('catalogues.archivedToast'));
       await queryClient.invalidateQueries({ queryKey: ['catalogue', active] });
     },
   });
   const unarchiveMut = useMutation({
     mutationFn: (id: string) => unarchiveItem(id),
     onSuccess: async () => {
-      toast.success('Restored');
+      toast.success(t('catalogues.restoredToast'));
       await queryClient.invalidateQueries({ queryKey: ['catalogue', active] });
     },
   });
@@ -78,8 +78,8 @@ export function CataloguesPage() {
   return (
     <>
       <PageHeader
-        title="Service catalogues"
-        description="Configure laboratory tests, imaging, ECO, emergency services, and pharmacy drugs. Codes are unique within a category."
+        title={t('catalogues.title')}
+        description={t('catalogues.description')}
         actions={
           <Button
             onClick={() => {
@@ -88,7 +88,7 @@ export function CataloguesPage() {
             }}
           >
             <Plus size={14} className="me-1.5" />
-            New item
+            {t('catalogues.newItem')}
           </Button>
         }
       />
@@ -110,7 +110,7 @@ export function CataloguesPage() {
               )}
             >
               <Icon size={14} />
-              {x.label}
+              {t(`catalogues.tab.${x.category}`)}
             </button>
           );
         })}
@@ -123,11 +123,11 @@ export function CataloguesPage() {
               <tab.icon size={18} />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-ink-900">{tab.label} catalogue</h3>
+              <h3 className="text-sm font-semibold text-ink-900">{t('catalogues.catalogueOf', { name: t(`catalogues.tab.${tab.category}`) })}</h3>
               <p className="text-xs text-ink-500">
-                {items ? `${items.length} item${items.length === 1 ? '' : 's'}` : ''}
+                {items ? t('catalogues.itemCount', { count: items.length }) : ''}
                 {items && items.some((i) => i.forwardTo)
-                  ? ' · some items forward to other departments'
+                  ? t('catalogues.forwardsHint')
                   : ''}
               </p>
             </div>
@@ -139,12 +139,12 @@ export function CataloguesPage() {
         ) : !items || items.length === 0 ? (
           <EmptyState
             icon={tab.icon}
-            title="No catalogue items yet"
-            description="Add the first entry to make this category available to the workflows."
+            title={t('catalogues.noItems')}
+            description={t('catalogues.noItemsHint')}
             action={
               <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
                 <Plus size={14} className="me-1.5" />
-                Add item
+                {t('catalogues.addItem')}
               </Button>
             }
           />
@@ -153,11 +153,11 @@ export function CataloguesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-ink-100 bg-ink-50/60 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                 <tr>
-                  <Th>Code</Th>
-                  <Th>Name</Th>
-                  <Th>Fee</Th>
-                  <Th>Status</Th>
-                  <Th className="w-32 text-end">Actions</Th>
+                  <Th>{t('catalogues.colCode')}</Th>
+                  <Th>{t('catalogues.colName')}</Th>
+                  <Th>{t('catalogues.colFee')}</Th>
+                  <Th>{t('catalogues.colStatus')}</Th>
+                  <Th className="w-32 text-end">{t('common.actions')}</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
@@ -188,9 +188,9 @@ export function CataloguesPage() {
                     </Td>
                     <Td>
                       {it.active ? (
-                        <Badge tone="success" dot>Active</Badge>
+                        <Badge tone="success" dot>{t('catalogues.active')}</Badge>
                       ) : (
-                        <Badge tone="neutral" dot>Archived</Badge>
+                        <Badge tone="neutral" dot>{t('catalogues.archived')}</Badge>
                       )}
                     </Td>
                     <Td className="text-end">
@@ -199,8 +199,8 @@ export function CataloguesPage() {
                           type="button"
                           onClick={() => { setEditing(it); setDialogOpen(true); }}
                           className="rounded-md p-1.5 text-ink-500 hover:bg-ink-100 hover:text-ink-900"
-                          aria-label="Edit"
-                          title="Edit"
+                          aria-label={t('common.edit')}
+                          title={t('common.edit')}
                         >
                           <Pencil size={14} />
                         </button>
@@ -209,8 +209,8 @@ export function CataloguesPage() {
                             type="button"
                             onClick={() => archiveMut.mutate(it.id)}
                             className="rounded-md p-1.5 text-ink-500 hover:bg-amber-50 hover:text-amber-700"
-                            aria-label="Archive"
-                            title="Archive"
+                            aria-label={t('catalogues.archived')}
+                            title={t('catalogues.archived')}
                           >
                             <Archive size={14} />
                           </button>
@@ -219,8 +219,8 @@ export function CataloguesPage() {
                             type="button"
                             onClick={() => unarchiveMut.mutate(it.id)}
                             className="rounded-md p-1.5 text-ink-500 hover:bg-emerald-50 hover:text-emerald-700"
-                            aria-label="Restore"
-                            title="Restore"
+                            aria-label={t('catalogues.restoredToast')}
+                            title={t('catalogues.restoredToast')}
                           >
                             <ArchiveRestore size={14} />
                           </button>
