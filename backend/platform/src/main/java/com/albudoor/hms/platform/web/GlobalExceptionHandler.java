@@ -4,18 +4,26 @@ import com.albudoor.hms.platform.exception.ConflictException;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(NotFoundException ex) {
@@ -65,9 +73,54 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(403, "FORBIDDEN", ex.getMessage()));
     }
 
+    /**
+     * Optimistic-lock conflicts (JPA {@code @Version} mismatch). Registering the Spring DAO
+     * superclass {@link OptimisticLockingFailureException} also covers the ORM subclass
+     * {@code ObjectOptimisticLockingFailureException}.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(409, "CONCURRENT_MODIFICATION",
+                        "This record was changed by another operation. Please reload and try again."));
+    }
+
+    /**
+     * Malformed request body (unparseable JSON, invalid enum value, type-incompatible field).
+     * The parser message is intentionally suppressed — it leaks accepted enum value lists.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleNotReadable(HttpMessageNotReadableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiError.of(400, "MALFORMED_REQUEST",
+                        "Request body is malformed or contains an invalid value."));
+    }
+
+    /** Path/query parameter that cannot be coerced to the target type (e.g. non-UUID path var). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiError.of(400, "INVALID_PARAMETER", "A request parameter has an invalid value."));
+    }
+
+    /** Database constraint breach (FK, unique, not-null). The DB message is not echoed. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(409, "CONSTRAINT_VIOLATION", "The operation violates a data constraint."));
+    }
+
+    /** Bad arguments that surface as {@link IllegalArgumentException} (e.g. negative page index). */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiError.of(400, "INVALID_REQUEST", "The request could not be processed."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAny(Exception ex) {
+        log.error("Unhandled exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiError.of(500, "INTERNAL_ERROR", ex.getMessage()));
+                .body(ApiError.of(500, "INTERNAL_ERROR", "An unexpected error occurred."));
     }
 }
