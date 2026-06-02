@@ -2,6 +2,7 @@ package com.albudoor.hms.departmentservices.uploadfindings;
 
 import com.albudoor.hms.departmentservices.domain.DepartmentCase;
 import com.albudoor.hms.departmentservices.infrastructure.DepartmentCaseRepository;
+import com.albudoor.hms.departmentservices.security.DepartmentRoleGuard;
 import com.albudoor.hms.identity.infrastructure.security.HmsUserPrincipal;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import org.springframework.security.core.Authentication;
@@ -15,15 +16,20 @@ import java.util.UUID;
 public class UploadFindingsHandler {
 
     private final DepartmentCaseRepository cases;
+    private final DepartmentRoleGuard roleGuard;
 
-    public UploadFindingsHandler(DepartmentCaseRepository cases) {
+    public UploadFindingsHandler(DepartmentCaseRepository cases, DepartmentRoleGuard roleGuard) {
         this.cases = cases;
+        this.roleGuard = roleGuard;
     }
 
     @Transactional
     public DepartmentCase handle(UUID caseId, UploadFindingsCommand cmd) {
         DepartmentCase deptCase = cases.findById(caseId)
                 .orElseThrow(() -> new NotFoundException("Case not found: " + caseId));
+
+        // The caller's department role must match this case's category (ADMIN bypasses).
+        roleGuard.requireDepartmentMatches(deptCase.getCategory());
 
         UUID userId = currentUserId();
         deptCase.uploadFindings(

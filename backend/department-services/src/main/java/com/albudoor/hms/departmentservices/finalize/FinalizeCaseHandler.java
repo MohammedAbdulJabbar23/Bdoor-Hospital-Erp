@@ -3,6 +3,7 @@ package com.albudoor.hms.departmentservices.finalize;
 import com.albudoor.hms.departmentservices.domain.DepartmentCase;
 import com.albudoor.hms.departmentservices.domain.DepartmentCaseStatus;
 import com.albudoor.hms.departmentservices.infrastructure.DepartmentCaseRepository;
+import com.albudoor.hms.departmentservices.security.DepartmentRoleGuard;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.visitmanagement.domain.Visit;
 import com.albudoor.hms.visitmanagement.domain.VisitStatus;
@@ -29,21 +30,27 @@ public class FinalizeCaseHandler {
     private final DepartmentCaseRepository cases;
     private final VisitRepository visits;
     private final ApplicationEventPublisher events;
+    private final DepartmentRoleGuard roleGuard;
 
     public FinalizeCaseHandler(
             DepartmentCaseRepository cases,
             VisitRepository visits,
-            ApplicationEventPublisher events
+            ApplicationEventPublisher events,
+            DepartmentRoleGuard roleGuard
     ) {
         this.cases = cases;
         this.visits = visits;
         this.events = events;
+        this.roleGuard = roleGuard;
     }
 
     @Transactional
     public DepartmentCase handle(UUID caseId) {
         DepartmentCase deptCase = cases.findById(caseId)
                 .orElseThrow(() -> new NotFoundException("Case not found: " + caseId));
+
+        // The caller's department role must match this case's category (ADMIN bypasses).
+        roleGuard.requireDepartmentMatches(deptCase.getCategory());
 
         String summary = deptCase.buildResultsSummary();
 

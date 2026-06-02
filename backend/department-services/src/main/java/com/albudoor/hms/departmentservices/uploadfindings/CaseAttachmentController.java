@@ -118,7 +118,7 @@ public class CaseAttachmentController {
     }
 
     @GetMapping("/{caseId}/attachments")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('LAB_STAFF', 'RADIOLOGY_STAFF', 'ECO_STAFF', 'DOCTOR', 'ADMIN')")
     public List<AttachmentResponse> list(@PathVariable UUID caseId) {
         return attachments.findAllByCaseIdOrderByUploadedAtAsc(caseId).stream()
                 .map(AttachmentResponse::from)
@@ -126,7 +126,7 @@ public class CaseAttachmentController {
     }
 
     @GetMapping("/attachments/{id}/file")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('LAB_STAFF', 'RADIOLOGY_STAFF', 'ECO_STAFF', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<Resource> download(@PathVariable UUID id) throws IOException {
         CaseAttachment a = attachments.findById(id)
                 .orElseThrow(() -> new NotFoundException("Attachment not found: " + id));

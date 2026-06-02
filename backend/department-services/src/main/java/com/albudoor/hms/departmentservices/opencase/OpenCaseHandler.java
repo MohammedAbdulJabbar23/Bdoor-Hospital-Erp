@@ -10,6 +10,7 @@ import com.albudoor.hms.departmentservices.domain.CaseServiceLine;
 import com.albudoor.hms.departmentservices.domain.DepartmentCase;
 import com.albudoor.hms.departmentservices.domain.DepartmentCategory;
 import com.albudoor.hms.departmentservices.infrastructure.DepartmentCaseRepository;
+import com.albudoor.hms.departmentservices.security.DepartmentRoleGuard;
 import com.albudoor.hms.platform.exception.ConflictException;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
@@ -29,23 +30,29 @@ public class OpenCaseHandler {
     private final ServiceItemRepository catalogue;
     private final CreatePaymentHandler createPayment;
     private final ApplicationEventPublisher events;
+    private final DepartmentRoleGuard roleGuard;
 
     public OpenCaseHandler(
             DepartmentCaseRepository cases,
             VisitRepository visits,
             ServiceItemRepository catalogue,
             CreatePaymentHandler createPayment,
-            ApplicationEventPublisher events
+            ApplicationEventPublisher events,
+            DepartmentRoleGuard roleGuard
     ) {
         this.cases = cases;
         this.visits = visits;
         this.catalogue = catalogue;
         this.createPayment = createPayment;
         this.events = events;
+        this.roleGuard = roleGuard;
     }
 
     @Transactional
     public DepartmentCase handle(OpenCaseCommand cmd) {
+        // The caller's department role must match the case's category (ADMIN bypasses).
+        roleGuard.requireDepartmentMatches(cmd.category());
+
         Visit visit = visits.findById(cmd.visitId())
                 .orElseThrow(() -> new NotFoundException("Visit not found: " + cmd.visitId()));
 

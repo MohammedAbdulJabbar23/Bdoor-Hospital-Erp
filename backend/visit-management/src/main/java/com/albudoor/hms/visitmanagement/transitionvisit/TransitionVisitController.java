@@ -22,7 +22,7 @@ public class TransitionVisitController {
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR')")
     public VisitResponse transition(
             @PathVariable UUID id,
             @Valid @RequestBody TransitionVisitCommand cmd

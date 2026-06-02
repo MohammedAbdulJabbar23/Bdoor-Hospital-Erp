@@ -16,7 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/payments")
-@PreAuthorize("isAuthenticated()")
+@PreAuthorize("hasAnyRole('CASHIER', 'ADMIN')")
 public class ListPaymentsController {
 
     private final ListPaymentsHandler handler;
