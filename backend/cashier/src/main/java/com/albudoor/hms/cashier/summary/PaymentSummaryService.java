@@ -47,6 +47,8 @@ public class PaymentSummaryService {
         BigDecimal receivedToday = repo.sumApprovedBetween(dayStart, dayEnd, true);
         long approvedTodayCount = repo.countApprovedBetween(dayStart, dayEnd, true);
 
+        Instant oldestPendingAt = repo.minCreatedAtByStatus(PaymentStatus.PENDING);
+
         Map<PaymentStage, Long> pendingByStage = new EnumMap<>(PaymentStage.class);
         for (Object[] row : repo.countByStatusGroupedByStage(PaymentStatus.PENDING)) {
             pendingByStage.put((PaymentStage) row[0], ((Number) row[1]).longValue());
@@ -57,6 +59,7 @@ public class PaymentSummaryService {
                 nz(pendingTotal),
                 nz(receivedToday),
                 approvedTodayCount,
+                oldestPendingAt,
                 pendingByStage);
     }
 

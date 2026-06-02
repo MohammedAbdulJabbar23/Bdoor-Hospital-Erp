@@ -55,6 +55,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     @Query("SELECT COALESCE(SUM(p.totalDue), 0) FROM Payment p WHERE p.status = :status")
     BigDecimal sumTotalDueByStatus(@Param("status") PaymentStatus status);
 
+    /** Creation time of the oldest payment in the given status, or {@code null} when none. */
+    @Query("SELECT MIN(p.createdAt) FROM Payment p WHERE p.status = :status")
+    Instant minCreatedAtByStatus(@Param("status") PaymentStatus status);
+
     /** Pending counts per stage, as {@code [stage, count]} rows — cheap one-shot for the queue tiles. */
     @Query("""
             SELECT p.stage, COUNT(p) FROM Payment p

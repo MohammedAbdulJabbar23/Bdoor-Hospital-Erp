@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import {
   Wallet, Crown, CheckCircle2, XCircle, Receipt,
   ChevronLeft, ChevronRight, X, Banknote, CreditCard, Building2,
-  Search, Clock, AlertTriangle, TrendingUp, Hourglass,
+  Search, Clock, AlertTriangle, TrendingUp, Hourglass, CalendarClock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
@@ -18,8 +18,8 @@ import { Skeleton } from '@/shared/ui/Skeleton';
 import { Input } from '@/shared/ui/Input';
 import { extractApiError } from '@/shared/api/client';
 import {
-  searchPayments, approvePayment, rejectPayment,
-  Payment, PaymentStatus, PaymentStage,
+  searchPayments, approvePayment, rejectPayment, getPaymentSummary, getReconciliation,
+  Payment, PaymentStatus, PaymentStage, Reconciliation,
 } from './api';
 import { cn } from '@/shared/ui/cn';
 import { printRoutingSlip } from '@/shared/print/RoutingSlip';
@@ -34,34 +34,29 @@ export function CashierQueuePage() {
   const [page, setPage] = useState(0);
   const [openPayment, setOpenPayment] = useState<Payment | null>(null);
   const [openMode, setOpenMode] = useState<'approve' | 'reject' | null>(null);
+  const [reconOpen, setReconOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Page being viewed (filtered by tab/stage server-side, paginated)
+  // Debounce the search box so we don't fire a request on every keystroke. The e2e fills the
+  // box in one shot then waits for the row, so a short debounce stays well within its timeout.
+  const debouncedQuery = useDebounced(query, 250);
+
+  // Page being viewed (filtered server-side by tab/stage/q, paginated). Server-side q means the
+  // search spans the WHOLE queue, not just the loaded page.
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['payments', tab, stage, page],
-    queryFn: () => searchPayments(tab, stage, page, 20),
+    queryKey: ['payments', tab, stage, page, debouncedQuery],
+    queryFn: () => searchPayments(tab, stage, page, 20, debouncedQuery),
     placeholderData: (prev) => prev,
     refetchInterval: 10000,
   });
 
-  // Pending overview — fetch a flat snapshot of all pending so we can count, sum, slice by stage. Bounded enough to do client-side.
-  const pendingOverview = useQuery({
-    queryKey: ['payments-pending-overview'],
-    queryFn: () => searchPayments('PENDING', null, 0, 200),
+  // Server-computed KPIs — uncapped DB aggregates, VIP-bypass correctly excluded from received.
+  const summaryQuery = useQuery({
+    queryKey: ['payments-summary'],
+    queryFn: getPaymentSummary,
     refetchInterval: 10000,
   });
-  const pendingAll = pendingOverview.data?.content ?? [];
-
-  // Approved-today snapshot — drives the "received today" KPI.
-  const approvedToday = useQuery({
-    queryKey: ['payments-approved-today'],
-    queryFn: () => searchPayments('APPROVED', null, 0, 200),
-    refetchInterval: 30000,
-  });
-  const approvedTodayList = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return (approvedToday.data?.content ?? []).filter((p) => p.decidedAt && new Date(p.decidedAt) >= today);
-  }, [approvedToday.data]);
+  const summary = summaryQuery.data;
 
   const fmt = useMemo(
     () => new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-IQ' : 'en-US', { maximumFractionDigits: 0 }),
@@ -72,29 +67,19 @@ export function CashierQueuePage() {
     [i18n.language],
   );
 
-  // KPI calculations on the pending snapshot
-  const pendingCount  = pendingAll.length;
-  const cashExposure  = pendingAll.reduce((s, p) => s + p.totalDue, 0);
-  const oldestPendingMin = pendingAll.length === 0 ? 0
-    : Math.max(...pendingAll.map((p) => paymentAgeMinutes(p)));
-  // Cash actually received today excludes VIP-bypass approvals (no money changed hands).
-  const receivedToday = approvedTodayList
-    .filter((p) => !p.vipBypass && p.paymentMethod !== 'VIP_BYPASS')
-    .reduce((s, p) => s + p.totalDue, 0);
+  // KPI values come straight from the server summary.
+  const pendingCount  = summary?.pendingCount ?? 0;
+  const cashExposure  = summary?.pendingTotal ?? 0;
+  const receivedToday = summary?.receivedToday ?? 0;
+  const approvedTodayCount = summary?.approvedTodayCount ?? 0;
+  const oldestPendingMin = summary?.oldestPendingAt
+    ? Math.max(0, (Date.now() - new Date(summary.oldestPendingAt).getTime()) / 60000)
+    : 0;
   const stageCounts: Record<PaymentStage, number> = { INITIAL: 0, REFERRAL: 0, FINAL: 0, STAY_EXTENSION: 0, PHARMACY: 0 };
-  for (const p of pendingAll) stageCounts[p.stage]++;
+  for (const s of STAGE_KEYS) stageCounts[s] = summary?.pendingByStage?.[s] ?? 0;
 
-  // Search filter on the page in view (cheap — small page).
-  const visibleRows = useMemo(() => {
-    const rows = data?.content ?? [];
-    if (!query.trim()) return rows;
-    const n = query.trim().toLowerCase();
-    return rows.filter((p) =>
-      p.paymentDisplayId.toLowerCase().includes(n)
-      || p.patientName.toLowerCase().includes(n)
-      || p.patientMrn.toLowerCase().includes(n)
-      || p.visitDisplayId.toLowerCase().includes(n));
-  }, [data, query]);
+  // Search now happens server-side (whole queue); the page in view is already filtered.
+  const visibleRows = data?.content ?? [];
 
   // Pending: oldest first (most-attention-worthy on top). Approved/rejected: most-recent decision first.
   const sortedRows = useMemo(() => {
@@ -116,8 +101,8 @@ export function CashierQueuePage() {
     onSuccess: async (p) => {
       toast.success(t('cashier.approvedToast', { id: p.paymentDisplayId }));
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
-      await queryClient.invalidateQueries({ queryKey: ['payments-pending-overview'] });
-      await queryClient.invalidateQueries({ queryKey: ['payments-approved-today'] });
+      await queryClient.invalidateQueries({ queryKey: ['payments-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['payments-reconciliation'] });
       // Auto-print routing slip — patient takes this to the next handoff (department/pharmacy).
       printRoutingSlip({
         patientName: p.patientName,
@@ -141,7 +126,7 @@ export function CashierQueuePage() {
     onSuccess: async (p) => {
       toast.success(t('cashier.rejectedToast', { id: p.paymentDisplayId }));
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
-      await queryClient.invalidateQueries({ queryKey: ['payments-pending-overview'] });
+      await queryClient.invalidateQueries({ queryKey: ['payments-summary'] });
       setOpenPayment(null); setOpenMode(null);
     },
     onError: (err) => {
@@ -155,6 +140,12 @@ export function CashierQueuePage() {
       <PageHeader
         title={t('cashier.title')}
         description={t('cashier.description')}
+        actions={
+          <Button variant="secondary" onClick={() => setReconOpen(true)}>
+            <CalendarClock size={14} className="me-1.5" />
+            {t('cashier.closeOfDay')}
+          </Button>
+        }
       />
 
       {/* ======================== KPI strip ======================== */}
@@ -182,7 +173,7 @@ export function CashierQueuePage() {
           icon={TrendingUp} tone="success"
           label={t('cashier.kpiReceivedToday')}
           value={fmt.format(receivedToday)}
-          hint={t('cashier.kpiReceivedTodayHint', { count: approvedTodayList.length })}
+          hint={t('cashier.kpiReceivedTodayHint', { count: approvedTodayCount })}
         />
       </div>
 
@@ -318,8 +309,23 @@ export function CashierQueuePage() {
           formatCurrency={fmt}
         />
       )}
+
+      {reconOpen && (
+        <ReconciliationDialog onClose={() => setReconOpen(false)} formatCurrency={fmt} />
+      )}
     </>
   );
+}
+
+/* ============================================================== Debounce hook ============================================================== */
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 /* ============================================================== Row ============================================================== */
@@ -537,6 +543,159 @@ function DecisionDialog({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================== Reconciliation / close-of-day ============================================================== */
+
+/** Local YYYY-MM-DD for an input[type=date], avoiding the UTC shift of toISOString(). */
+function todayLocalISODate(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+}
+
+function ReconciliationDialog({
+  onClose, formatCurrency,
+}: {
+  onClose: () => void;
+  formatCurrency: Intl.NumberFormat;
+}) {
+  const { t } = useTranslation();
+  const [date, setDate] = useState<string>(todayLocalISODate());
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['payments-reconciliation', date],
+    queryFn: () => getReconciliation(date),
+  });
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-900/50 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-elevated">
+        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-ink-900">{t('cashier.reconTitle')}</h2>
+            <p className="mt-0.5 text-xs text-ink-500">{t('cashier.reconSubtitle')}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-ink-500 hover:bg-ink-100">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 border-b border-ink-100 bg-ink-50/40 px-5 py-3">
+          <label className="text-sm font-medium text-ink-700">{t('cashier.reconDate')}</label>
+          <input
+            type="date" value={date} max={todayLocalISODate()}
+            onChange={(e) => setDate(e.target.value)}
+            data-testid="recon-date"
+            className="h-9 rounded-lg border border-ink-200 bg-white px-2 text-sm focus:border-brand-500"
+          />
+        </div>
+
+        <div className="space-y-5 overflow-y-auto p-5">
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </div>
+          ) : isError || !data ? (
+            <EmptyState icon={Wallet} title={t('cashier.reconError')} />
+          ) : (
+            <>
+              {/* Totals */}
+              <div className="grid grid-cols-3 gap-3">
+                <ReconTotal label={t('cashier.reconCashCollected')} tone="success"
+                  value={formatCurrency.format(data.cashCollected.total)} count={data.cashCollected.count} t={t} />
+                <ReconTotal label={t('cashier.reconVipBypass')} tone="muted"
+                  value={formatCurrency.format(data.vipBypass.total)} count={data.vipBypass.count} t={t} />
+                <ReconTotal label={t('cashier.reconGrandTotal')} tone="info"
+                  value={formatCurrency.format(data.grandTotal.total)} count={data.grandTotal.count} t={t} />
+              </div>
+
+              {/* By method */}
+              <ReconTable
+                title={t('cashier.reconByMethod')}
+                emptyText={t('cashier.reconNoApprovals')}
+                rows={data.byMethod}
+                labelFor={(k) => t(`cashier.methodLabel.${k}`, { defaultValue: k })}
+                formatCurrency={formatCurrency} t={t}
+              />
+
+              {/* By stage */}
+              <ReconTable
+                title={t('cashier.reconByStage')}
+                emptyText={t('cashier.reconNoApprovals')}
+                rows={data.byStage}
+                labelFor={(k) => t(`cashier.stageLabel.${k}`, { defaultValue: k })}
+                formatCurrency={formatCurrency} t={t}
+              />
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end border-t border-ink-100 bg-ink-50/40 px-5 py-3">
+          <Button type="button" variant="secondary" onClick={onClose}>{t('common.close')}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReconTotal({
+  label, value, count, tone, t,
+}: {
+  label: string; value: string; count: number;
+  tone: 'success' | 'muted' | 'info'; t: TFunction;
+}) {
+  const cls = {
+    success: 'border-emerald-200 bg-emerald-50',
+    muted:   'border-ink-200 bg-ink-50',
+    info:    'border-sky-200 bg-sky-50',
+  }[tone];
+  return (
+    <div className={cn('rounded-xl border p-3', cls)}>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold tabular-nums text-ink-900">{value}</div>
+      <div className="text-[11px] text-ink-500">{t('cashier.reconCount', { count })}</div>
+    </div>
+  );
+}
+
+function ReconTable({
+  title, rows, labelFor, formatCurrency, emptyText, t,
+}: {
+  title: string;
+  rows: Reconciliation['byMethod'];
+  labelFor: (key: string) => string;
+  formatCurrency: Intl.NumberFormat;
+  emptyText: string;
+  t: TFunction;
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold text-ink-700">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-ink-200 px-3 py-4 text-center text-xs text-ink-500">{emptyText}</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="border-b border-ink-100 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+            <tr>
+              <th className="px-2 py-2 text-start">{title}</th>
+              <th className="px-2 py-2 text-end">{t('cashier.reconColCount')}</th>
+              <th className="px-2 py-2 text-end">{t('cashier.reconColTotal')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ink-100">
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td className="px-2 py-2 text-ink-900">{labelFor(r.key)}</td>
+                <td className="px-2 py-2 text-end tabular-nums text-ink-600">{r.count}</td>
+                <td className="px-2 py-2 text-end font-mono font-semibold tabular-nums text-ink-900">{formatCurrency.format(r.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
