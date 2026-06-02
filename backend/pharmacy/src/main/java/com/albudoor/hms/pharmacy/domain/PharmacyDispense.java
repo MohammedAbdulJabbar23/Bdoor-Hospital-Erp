@@ -192,6 +192,28 @@ public class PharmacyDispense extends AggregateRoot {
         return d;
     }
 
+    /**
+     * Re-sync the dispense lines to the doctor's current prescriptions after an exam was
+     * reopened, amended and re-finalized. Only legal while still PENDING (not yet sent to the
+     * cashier): once a dispense is charged/given we can't un-bill it, so reconciliation is
+     * skipped in those states. Returns {@code true} if the lines were replaced.
+     *
+     * <p>If the amended prescription set is empty, the dispense is cancelled instead — there's
+     * nothing left to dispense.
+     */
+    public boolean reconcileLines(List<DispenseLine> newLines) {
+        if (status != DispenseStatus.PENDING) {
+            return false;
+        }
+        if (newLines == null || newLines.isEmpty()) {
+            cancel("Reconciled to amended exam with no prescriptions");
+            return true;
+        }
+        this.lines.clear();
+        this.lines.addAll(newLines);
+        return true;
+    }
+
     /** Cashier handoff: links the created payment and parks the dispense waiting for cashier approval. */
     public void charge(UUID paymentId) {
         if (status != DispenseStatus.PENDING) {

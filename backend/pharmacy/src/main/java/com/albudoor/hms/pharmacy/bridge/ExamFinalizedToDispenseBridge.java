@@ -61,14 +61,6 @@ public class ExamFinalizedToDispenseBridge {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onFinalized(ExamFinalizedEvent event) {
-        if (event.prescriptionCount() == 0) return;
-
-        // Idempotency: a re-fire (e.g. via retry) must not create a duplicate dispense.
-        if (dispenses.findByExamId(event.examId()).isPresent()) {
-            log.debug("Dispense already exists for exam {}; skipping", event.examId());
-            return;
-        }
-
         DoctorExam exam = exams.findById(event.examId()).orElse(null);
         if (exam == null) {
             log.warn("ExamFinalized for unknown exam {}", event.examId());
@@ -79,6 +71,26 @@ public class ExamFinalizedToDispenseBridge {
         for (PrescriptionEntry rx : exam.getPrescriptions()) {
             lines.add(toDispenseLine(rx));
         }
+
+        PharmacyDispense existing = dispenses.findByExamId(event.examId()).orElse(null);
+        if (existing != null) {
+            // The exam was reopened, amended and re-finalized. If the dispense hasn't been sent
+            // to the cashier yet (PENDING) reconcile its lines to the current prescriptions so a
+            // removed drug isn't still dispensed; if it's already charged/given we can't un-bill
+            // it, so we leave it untouched (and never add a contradictory second dispense).
+            boolean reconciled = existing.reconcileLines(lines);
+            if (reconciled) {
+                dispenses.save(existing);
+                log.info("Pharmacy dispense {} reconciled to amended exam {} ({} lines, status {})",
+                        existing.getDispenseDisplayId(), exam.getId(),
+                        existing.getLines().size(), existing.getStatus());
+            } else {
+                log.info("Dispense {} for exam {} is {} (already past PENDING); leaving as-is",
+                        existing.getDispenseDisplayId(), exam.getId(), existing.getStatus());
+            }
+            return;
+        }
+
         if (lines.isEmpty()) return;
 
         PharmacyDispense d = PharmacyDispense.fromExam(

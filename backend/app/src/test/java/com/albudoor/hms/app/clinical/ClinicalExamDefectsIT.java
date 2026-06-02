@@ -312,4 +312,104 @@ class ClinicalExamDefectsIT extends IntegrationTest {
         ResponseEntity<Map> cashierRead = getRaw("/api/exams/" + examId, "cashier");
         assertThat(cashierRead.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    // ---- Fix #6(a): block reopen on a terminal visit ----
+
+    @Test
+    void reopen_blockedWhenVisitTerminal() {
+        // Normal flow: finalize closes the visit to COMPLETED (terminal).
+        String visitId = inProgressDoctorVisit();
+        Map<?, ?> exam = put("/api/exams", examBody(visitId), "doctor", Map.class);
+        post("/api/exams/" + exam.get("id") + "/finalize", null, "doctor", Map.class);
+        await().atMost(ofSeconds(5)).untilAsserted(() ->
+                assertThat(visits.findById(UUID.fromString(visitId)).get().getStatus())
+                        .isEqualTo(VisitStatus.COMPLETED));
+
+        // Reopening an exam on a closed visit would leave it permanently stuck in DRAFT.
+        ResponseEntity<Map> res = postRaw("/api/exams/" + exam.get("id") + "/reopen", null, "admin");
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(res.getBody().get("code")).isEqualTo("VISIT_TERMINAL");
+    }
+
+    @Test
+    void reopen_allowedWhenVisitStillOpen() {
+        // A forwarded visit stays AWAITING_RESULTS after finalize (not terminal) → reopen ok.
+        String[] s = forwardedVisitWithFinalizedExam(1, false);
+        String examId = s[0];
+
+        Map<?, ?> reopened = post("/api/exams/" + examId + "/reopen", null, "admin", Map.class);
+        assertThat(reopened.get("status")).isEqualTo("DRAFT");
+    }
+
+    // ---- Fix #6(b): reconcile a PENDING dispense to amended prescriptions on re-finalize ----
+
+    @Test
+    void refinalize_reconcilesPendingDispense_removingDroppedPrescription() {
+        // Two prescriptions (one real DRUG) on a forwarded (non-terminal) visit, finalized.
+        String[] s = forwardedVisitWithFinalizedExam(2, true);
+        String examId = s[0], visitId = s[1];
+
+        // Dispense should exist PENDING with 2 lines.
+        await().atMost(ofSeconds(10)).untilAsserted(() -> {
+            PharmacyDispense d = dispenses.findByExamId(UUID.fromString(examId)).orElseThrow();
+            assertThat(d.getStatus().name()).isEqualTo("PENDING");
+            assertThat(d.getLines()).hasSize(2);
+        });
+
+        // Admin reopens; doctor amends to a single prescription; re-finalize.
+        post("/api/exams/" + examId + "/reopen", null, "admin", Map.class);
+        Map<String, Object> amended = examBody(visitId);
+        Map<String, Object> rx = new HashMap<>();
+        rx.put("drugName", "Only one drug now");
+        rx.put("dose", "1 tab");
+        amended.put("prescriptions", List.of(rx));
+        put("/api/exams", amended, "doctor", Map.class);
+        post("/api/exams/" + examId + "/finalize", null, "doctor", Map.class);
+
+        // The still-PENDING dispense must be reconciled down to the single remaining line.
+        await().atMost(ofSeconds(10)).untilAsserted(() -> {
+            PharmacyDispense d = dispenses.findByExamId(UUID.fromString(examId)).orElseThrow();
+            assertThat(d.getStatus().name()).isEqualTo("PENDING");
+            assertThat(d.getLines()).hasSize(1);
+            assertThat(d.getLines().get(0).getDrugName()).isEqualTo("Only one drug now");
+        });
+    }
+
+    /**
+     * Builds a DOCTOR_APPOINTMENT visit, forwards it to LAB (parent → AWAITING_RESULTS so it
+     * stays non-terminal after finalize), records an exam with {@code rxCount} prescriptions
+     * (the first a real catalogue DRUG when {@code firstIsDrug}), and finalizes it.
+     * Returns [examId, visitId].
+     */
+    private String[] forwardedVisitWithFinalizedExam(int rxCount, boolean firstIsDrug) {
+        String visitId = inProgressDoctorVisit();
+
+        Map<String, Object> body = examBody(visitId);
+        java.util.List<Map<String, Object>> rxs = new java.util.ArrayList<>();
+        for (int i = 0; i < rxCount; i++) {
+            Map<String, Object> rx = new HashMap<>();
+            if (i == 0 && firstIsDrug) {
+                Map<String, Object> drug = findActiveItem("DRUG");
+                rx.put("drugServiceItemId", drug.get("id"));
+                rx.put("drugName", drug.get("nameEn"));
+            } else {
+                rx.put("drugName", "Free-text drug " + i);
+            }
+            rx.put("dose", "1 tab");
+            rx.put("frequency", "BID");
+            rx.put("duration", "5d");
+            rx.put("route", "PO");
+            rxs.add(rx);
+        }
+        body.put("prescriptions", rxs);
+        Map<?, ?> exam = put("/api/exams", body, "doctor", Map.class);
+
+        // Forward to LAB so the parent pauses at AWAITING_RESULTS (stays non-terminal).
+        post("/api/visits/" + visitId + "/forward", Map.of("targetType", "LABORATORY"), "doctor", Map.class);
+        assertThat(visits.findById(UUID.fromString(visitId)).get().getStatus())
+                .isEqualTo(VisitStatus.AWAITING_RESULTS);
+
+        post("/api/exams/" + exam.get("id") + "/finalize", null, "doctor", Map.class);
+        return new String[]{(String) exam.get("id"), visitId};
+    }
 }
