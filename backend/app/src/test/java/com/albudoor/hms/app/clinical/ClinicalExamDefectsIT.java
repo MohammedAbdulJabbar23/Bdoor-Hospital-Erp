@@ -1,8 +1,10 @@
 package com.albudoor.hms.app.clinical;
 
 import com.albudoor.hms.app.IntegrationTest;
-import com.albudoor.hms.cashier.domain.PaymentStatus;
 import com.albudoor.hms.cashier.infrastructure.PaymentRepository;
+import com.albudoor.hms.pharmacy.domain.DispenseLine;
+import com.albudoor.hms.pharmacy.domain.PharmacyDispense;
+import com.albudoor.hms.pharmacy.infrastructure.PharmacyDispenseRepository;
 import com.albudoor.hms.visitmanagement.domain.VisitStatus;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,7 @@ class ClinicalExamDefectsIT extends IntegrationTest {
     @Autowired TestRestTemplate rest;
     @Autowired VisitRepository visits;
     @Autowired PaymentRepository payments;
+    @Autowired PharmacyDispenseRepository dispenses;
 
     // ---- auth + HTTP helpers ----
 
@@ -238,5 +241,56 @@ class ClinicalExamDefectsIT extends IntegrationTest {
 
         ResponseEntity<Map> res = putRaw("/api/exams", body, "doctor");
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    // ---- Fix #5: pharmacy bridge must only bill DRUG-category items ----
+
+    private String finalizeExamWithPrescription(String drugServiceItemId, String drugName) {
+        String visitId = inProgressDoctorVisit();
+        Map<String, Object> body = examBody(visitId);
+        Map<String, Object> rx = new HashMap<>();
+        rx.put("drugServiceItemId", drugServiceItemId);
+        rx.put("drugName", drugName);
+        rx.put("dose", "1 tab");
+        rx.put("frequency", "BID");
+        rx.put("duration", "5d");
+        rx.put("route", "PO");
+        body.put("prescriptions", List.of(rx));
+        Map<?, ?> exam = put("/api/exams", body, "doctor", Map.class);
+        post("/api/exams/" + exam.get("id") + "/finalize", null, "doctor", Map.class);
+        return (String) exam.get("id");
+    }
+
+    @Test
+    void bridge_nonDrugCatalogueItem_isInformational_notBilled() {
+        // A doctor mistakenly references a LAB catalogue item id as a "drug".
+        Map<String, Object> lab = findActiveItem("LAB");
+        String examId = finalizeExamWithPrescription((String) lab.get("id"), "Some lab-coded entry");
+
+        await().atMost(ofSeconds(10)).untilAsserted(() -> {
+            PharmacyDispense d = dispenses.findByExamId(UUID.fromString(examId)).orElseThrow();
+            assertThat(d.getLines()).hasSize(1);
+            DispenseLine line = d.getLines().get(0);
+            // Non-DRUG item must NOT be priced as a dispensed drug.
+            assertThat(line.isBillable()).isFalse();
+            assertThat(line.getLineTotal()).isNull();
+            assertThat(line.getDrugServiceItemId()).isNull();
+        });
+    }
+
+    @Test
+    void bridge_drugCatalogueItem_isBilled() {
+        // Happy path regression: a real DRUG item is still priced/billed.
+        Map<String, Object> drug = findActiveItem("DRUG");
+        String examId = finalizeExamWithPrescription((String) drug.get("id"), (String) drug.get("nameEn"));
+
+        await().atMost(ofSeconds(10)).untilAsserted(() -> {
+            PharmacyDispense d = dispenses.findByExamId(UUID.fromString(examId)).orElseThrow();
+            assertThat(d.getLines()).hasSize(1);
+            DispenseLine line = d.getLines().get(0);
+            assertThat(line.isBillable()).isTrue();
+            assertThat(line.getDrugServiceItemId()).isNotNull();
+            assertThat(line.getLineTotal()).isNotNull();
+        });
     }
 }

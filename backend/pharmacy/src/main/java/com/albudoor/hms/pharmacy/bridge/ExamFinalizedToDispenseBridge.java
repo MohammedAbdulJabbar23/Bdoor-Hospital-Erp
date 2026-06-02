@@ -1,5 +1,6 @@
 package com.albudoor.hms.pharmacy.bridge;
 
+import com.albudoor.hms.catalogue.domain.ServiceCategory;
 import com.albudoor.hms.catalogue.domain.ServiceItem;
 import com.albudoor.hms.catalogue.infrastructure.ServiceItemRepository;
 import com.albudoor.hms.clinicalcase.domain.DoctorExam;
@@ -99,10 +100,14 @@ public class ExamFinalizedToDispenseBridge {
     }
 
     private DispenseLine toDispenseLine(PrescriptionEntry rx) {
-        // Price the line if the doctor picked a catalogue drug AND it's still active with a fee.
+        // Price the line only if the doctor picked a catalogue item that is a DRUG, still
+        // active, and has a fee. Items in any other category (LAB/IMAGING/EMERGENCY/etc.) are
+        // NOT pharmacy-dispensable drugs and must not be billed as such — they fall through to
+        // an informational (non-billable) line keyed on the doctor's free-text drug name.
         if (rx.getDrugServiceItemId() != null) {
             ServiceItem item = services.findById(rx.getDrugServiceItemId()).orElse(null);
-            if (item != null && item.isActive() && item.getFee() != null) {
+            if (item != null && item.getCategory() == ServiceCategory.DRUG
+                    && item.isActive() && item.getFee() != null) {
                 int qty = parseQuantityFromDuration(rx.getDuration(), rx.getFrequency());
                 return DispenseLine.billable(
                         item.getId(), item.getCode(), item.getNameEn(),
@@ -110,6 +115,10 @@ public class ExamFinalizedToDispenseBridge {
                         rx.getRoute(), rx.getNotes(),
                         item.getFee(), qty
                 );
+            } else if (item != null && item.getCategory() != ServiceCategory.DRUG) {
+                log.warn("Prescription referenced non-DRUG catalogue item {} (category {}); "
+                                + "treating as informational, not billing as a dispensed drug",
+                        item.getId(), item.getCategory());
             }
         }
         return DispenseLine.informational(
