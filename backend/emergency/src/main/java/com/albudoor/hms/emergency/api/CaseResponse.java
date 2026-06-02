@@ -12,7 +12,8 @@ public record CaseResponse(
         UUID serviceItemId, String serviceCode, String serviceName,
         String status, int stayValue, String stayUnit,
         Instant admittedAt, Instant stayExpiresAt, Instant treatmentFinishedAt, Instant closedAt,
-        UUID initialPaymentId, UUID finalPaymentId
+        UUID initialPaymentId, UUID finalPaymentId,
+        String dischargeNote, String finishOverrideReason
 ) {
     public static CaseResponse from(EmergencyCase c) {
         return new CaseResponse(c.getId(), c.getVisitId(), c.getVisitDisplayId(),
@@ -21,6 +22,7 @@ public record CaseResponse(
                 c.getServiceItemId(), c.getServiceCode(), c.getServiceName(),
                 c.getStatus().name(), c.getStayValue(), c.getStayUnit().name(),
                 c.getAdmittedAt(), c.getStayExpiresAt(), c.getTreatmentFinishedAt(), c.getClosedAt(),
-                c.getInitialPaymentId(), c.getFinalPaymentId());
+                c.getInitialPaymentId(), c.getFinalPaymentId(),
+                c.getDischargeNote(), c.getFinishOverrideReason());
     }
 }

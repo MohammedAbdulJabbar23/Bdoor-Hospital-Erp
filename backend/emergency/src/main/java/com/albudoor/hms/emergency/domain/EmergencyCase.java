@@ -45,6 +45,8 @@ public class EmergencyCase extends AggregateRoot {
     @Column(name = "closed_at") private Instant closedAt;
     @Column(name = "initial_payment_id") private UUID initialPaymentId;
     @Column(name = "final_payment_id") private UUID finalPaymentId;
+    @Column(name = "discharge_note") private String dischargeNote;
+    @Column(name = "finish_override_reason") private String finishOverrideReason;
 
     public static EmergencyCase open(
             UUID visitId, String visitDisplayId,
@@ -116,6 +118,18 @@ public class EmergencyCase extends AggregateRoot {
         require(EmergencyCaseStatus.AWAITING_DISCHARGE_PAYMENT, "close");
         this.status = EmergencyCaseStatus.CLOSED;
         this.closedAt = Instant.now();
+    }
+
+    public void setDischargeNote(String note) {
+        this.dischargeNote = note;
+    }
+
+    public void recordFinishOverride(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new DomainException("OVERRIDE_REASON_REQUIRED",
+                    "An override reason is required to finish with results pending");
+        }
+        this.finishOverrideReason = reason;
     }
 
     private void require(EmergencyCaseStatus expected, String action) {

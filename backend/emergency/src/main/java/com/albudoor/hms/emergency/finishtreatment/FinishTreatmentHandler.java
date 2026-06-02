@@ -12,6 +12,7 @@ import com.albudoor.hms.emergency.domain.EmergencyServiceCodes;
 import com.albudoor.hms.emergency.infrastructure.EmergencyCaseRepository;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
+import com.albudoor.hms.platform.exception.ResultsPendingException;
 import com.albudoor.hms.visitmanagement.domain.Visit;
 import com.albudoor.hms.visitmanagement.domain.VisitStatus;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
@@ -44,9 +45,24 @@ public class FinishTreatmentHandler {
     }
 
     @Transactional
-    public EmergencyCase handle(UUID caseId) {
+    public EmergencyCase handle(UUID caseId, FinishTreatmentCommand cmd) {
         EmergencyCase ec = cases.findById(caseId)
                 .orElseThrow(() -> new NotFoundException("Case not found: " + caseId));
+
+        // Results-pending gate (warn + override): open = child visit not COMPLETED/CANCELLED.
+        List<Visit> children = visits.findAllByParentVisitIdOrderByStartedAtDesc(ec.getVisitId());
+        List<Visit> open = children.stream()
+                .filter(v -> v.getStatus() != VisitStatus.COMPLETED && v.getStatus() != VisitStatus.CANCELLED)
+                .toList();
+        if (!open.isEmpty()) {
+            if (!cmd.override()) {
+                String list = open.stream()
+                        .map(v -> v.getVisitDisplayId() + " (" + v.getVisitType() + ", " + v.getStatus() + ")")
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new ResultsPendingException("Results still pending: " + list);
+            }
+            ec.recordFinishOverride(cmd.overrideReason()); // throws if reason blank
+        }
 
         ec.finishTreatment(); // UNDER_TREATMENT -> TREATMENT_FINISHED
         cases.save(ec);
