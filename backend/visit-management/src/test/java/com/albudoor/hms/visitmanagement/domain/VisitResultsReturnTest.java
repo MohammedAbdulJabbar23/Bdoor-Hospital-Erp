@@ -44,7 +44,7 @@ class VisitResultsReturnTest {
         parent.pullDomainEvents();
 
         // A late result returns to the now-closed parent: must not mutate the closed aggregate.
-        parent.receiveResultsFromChild(UUID.randomUUID(), VisitType.IMAGING, "LATE result");
+        parent.receiveResultsFromChild(UUID.randomUUID(), VisitType.RADIOLOGY, "LATE result");
 
         assertThat(parent.getStatus()).isEqualTo(VisitStatus.COMPLETED);
         assertThat(parent.getResultsSummary()).isEqualTo("first result"); // not overwritten

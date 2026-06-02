@@ -81,7 +81,7 @@ class PatientRegistryDefectsIT extends IntegrationTest {
     void apgar_over_ten_is_rejected_400() {
         Map<String, Object> body = new HashMap<>(Map.of(
                 "gender", "MALE", "dateOfBirth", "2026-05-01",
-                "placeOfBirth", "HOSPITAL", "deliveryType", "NORMAL",
+                "placeOfBirth", "THIS_HOSPITAL", "deliveryType", "VAGINAL",
                 "guardianName", "Guardian X", "motherName", "Mother X",
                 "apgar1Min", 11, "vip", false));
         ResponseEntity<Map> res = rest.exchange("/api/patients/infants", HttpMethod.POST,

@@ -17,11 +17,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,8 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Verifies that uploading an attachment to a finalized/terminal department case is rejected
- * with 422 CASE_FINALIZED. The case is driven to CLOSED directly via domain methods so the
- * test does not depend on the full forward/pay/findings HTTP choreography.
+ * with 422 CASE_FINALIZED. A real patient + visit + service item + payment are created over
+ * HTTP so the case's FKs (visit, payment, service item) all resolve, then the case is driven
+ * to CLOSED via domain methods (avoiding the full forward/findings HTTP choreography).
  */
 class CaseAttachmentFinalizedIT extends IntegrationTest {
 
@@ -43,16 +44,50 @@ class CaseAttachmentFinalizedIT extends IntegrationTest {
         return (String) res.getBody().get("token");
     }
 
-    @Transactional
-    DepartmentCase persistClosedCase() {
+    private HttpHeaders auth(String user) {
+        HttpHeaders h = new HttpHeaders();
+        h.setContentType(MediaType.APPLICATION_JSON);
+        h.setBearerAuth(token(user));
+        return h;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> postOk(String path, Object body, String user) {
+        ResponseEntity<Map> res = rest.exchange(path, HttpMethod.POST,
+                new HttpEntity<>(body, auth(user)), Map.class);
+        assertThat(res.getStatusCode().is2xxSuccessful())
+                .as("POST %s -> %s : %s", path, res.getStatusCode(), res.getBody()).isTrue();
+        return res.getBody();
+    }
+
+    private DepartmentCase persistClosedCase() {
+        Map<String, Object> item = postOk("/api/catalogue/items", Map.of(
+                "category", "LAB", "code", "CBC-" + System.nanoTime(),
+                "nameEn", "Complete Blood Count", "fee", 5000, "currency", "IQD"), "admin");
+        UUID serviceItemId = UUID.fromString((String) item.get("id"));
+
+        Map<String, Object> patient = postOk("/api/patients", Map.of(
+                "fullName", "Att Patient " + System.nanoTime(),
+                "gender", "MALE", "dateOfBirth", "1990-01-01",
+                "mobileNumber", "0770" + (System.nanoTime() % 10_000_000L), "vip", false),
+                "receptionist");
+        Map<String, Object> visit = postOk("/api/visits", Map.of(
+                "patientId", patient.get("id"), "visitType", "LABORATORY"), "receptionist");
+
+        Map<String, Object> payment = postOk("/api/payments", Map.of(
+                "visitId", visit.get("id"), "stage", "INITIAL",
+                "lines", List.of(Map.of("serviceItemId", serviceItemId.toString(), "quantity", 1)),
+                "currency", "IQD"), "cashier");
+
         DepartmentCase c = DepartmentCase.open(
                 DepartmentCategory.LAB,
-                UUID.randomUUID(), "V-ATT-" + System.nanoTime(),
+                UUID.fromString((String) visit.get("id")), (String) visit.get("visitDisplayId"),
                 VisitOrigin.DIRECT_NEW, null,
-                UUID.randomUUID(), "MRN-ATT", "Att Patient");
-        UUID serviceItemId = UUID.randomUUID();
-        c.addService(CaseServiceLine.pending(serviceItemId, "CBC", "Complete Blood Count", new BigDecimal("5000")));
-        c.linkPayment(UUID.randomUUID());
+                UUID.fromString((String) patient.get("id")),
+                (String) patient.get("mrn"), (String) patient.get("fullName"));
+        c.addService(CaseServiceLine.pending(serviceItemId, (String) item.get("code"),
+                "Complete Blood Count", new BigDecimal("5000")));
+        c.linkPayment(UUID.fromString((String) payment.get("id")));
         c.onPaymentApproved(); // AWAITING_STUDY
         c.uploadFindings(serviceItemId, "WBC normal", null, null, null, "NORMAL",
                 null, null, null, null, UUID.randomUUID()); // FINDINGS_COMPLETE
