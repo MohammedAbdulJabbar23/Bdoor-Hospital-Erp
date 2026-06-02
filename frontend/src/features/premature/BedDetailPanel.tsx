@@ -1,7 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Baby, BedDouble, CheckCircle2, ChevronRight, Clock, X as XIcon } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { Baby, BedDouble, CheckCircle2, ChevronRight, Clock, FlaskConical, X as XIcon } from 'lucide-react';
 import type { Admission, Bed, StayUnit } from './api';
+import { finishTreatment, listOrders, orderWorkup, setDischargeNote } from './api';
+import { extractApiError } from '@/shared/api/client';
 
 function fmt(iso?: string | null): string {
   if (!iso) return '—';
@@ -35,7 +39,7 @@ function statusBadgeClass(status?: string): string {
  * RTL-aware; Esc / scrim-click to close.
  */
 export function BedDetailPanel({
-  bed, admission, onClose, onExtend, onFinish, onReissue, pending, t, dir,
+  bed, admission, onClose, onExtend, onReissue, pending, t, dir,
 }: {
   bed: Bed;
   admission: Admission | null;
@@ -48,10 +52,70 @@ export function BedDetailPanel({
   dir: 'ltr' | 'rtl';
 }) {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [shown, setShown] = useState(false);
   const [extendValue, setExtendValue] = useState(1);
   const [extendUnit, setExtendUnit] = useState<StayUnit>('DAYS');
+  const [note, setNote] = useState('');
+  const [pendingMsg, setPendingMsg] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
+  const admissionId = admission?.id ?? null;
+  const isUnderCare = admission?.status === 'UNDER_CARE';
+
+  const invalidate = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['prem-beds'] }),
+      qc.invalidateQueries({ queryKey: ['prem-admissions'] }),
+      qc.invalidateQueries({ queryKey: ['prem-incoming'] }),
+      qc.invalidateQueries({ queryKey: ['payments'] }),
+      qc.invalidateQueries({ queryKey: ['visits'] }),
+    ]);
+  };
+
+  const ordersQuery = useQuery({
+    queryKey: ['prem-orders', admissionId],
+    queryFn: () => listOrders(admissionId as string),
+    enabled: !!admissionId && isUnderCare,
+  });
+
+  const orderMut = useMutation({
+    mutationFn: (target: 'LABORATORY' | 'RADIOLOGY' | 'ECO') => orderWorkup(admissionId as string, target),
+    onSuccess: async () => {
+      toast.success(t('premature.orders.ordered'));
+      await qc.invalidateQueries({ queryKey: ['prem-orders', admissionId] });
+    },
+    onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
+  });
+
+  const noteMut = useMutation({
+    mutationFn: () => setDischargeNote(admissionId as string, note),
+    onSuccess: () => toast.success(t('premature.dischargeNote.saved')),
+    onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
+  });
+
+  const finishMut = useMutation({
+    mutationFn: ({ override, reason }: { override: boolean; reason?: string }) =>
+      finishTreatment(admissionId as string, override, reason),
+    onSuccess: async () => {
+      setPendingMsg(null);
+      setOverrideReason('');
+      toast.success(t('premature.toast.finished'));
+      await invalidate();
+    },
+    onError: (e) => {
+      const apiErr = extractApiError(e);
+      if (apiErr?.code === 'RESULTS_PENDING') {
+        setPendingMsg(apiErr.message);
+        return;
+      }
+      toast.error(apiErr?.message ?? t('premature.toast.error'));
+    },
+  });
+
+  const busy = pending || orderMut.isPending || noteMut.isPending || finishMut.isPending;
+
+  useEffect(() => { setNote(admission?.dischargeNote ?? ''); }, [admission?.id, admission?.dischargeNote]);
   useEffect(() => { setShown(true); }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -162,6 +226,78 @@ export function BedDetailPanel({
             <div className="border-t border-ink-100 px-5 py-3">
               {status === 'UNDER_CARE' && (
                 <div className="space-y-2.5">
+                  {/* Orders — Lab / Radiology / ECO */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink-600">{t('premature.orders.title')}</label>
+                    <div className="mt-1 flex gap-1.5">
+                      <button
+                        type="button" disabled={busy}
+                        onClick={() => orderMut.mutate('LABORATORY')}
+                        className="flex-1 rounded-md border border-ink-200 px-2 py-1.5 text-[11px] font-medium hover:bg-ink-50 disabled:opacity-50"
+                        data-testid="order-LABORATORY"
+                      >
+                        {t('premature.orders.sendToLab')}
+                      </button>
+                      <button
+                        type="button" disabled={busy}
+                        onClick={() => orderMut.mutate('RADIOLOGY')}
+                        className="flex-1 rounded-md border border-ink-200 px-2 py-1.5 text-[11px] font-medium hover:bg-ink-50 disabled:opacity-50"
+                        data-testid="order-RADIOLOGY"
+                      >
+                        {t('premature.orders.sendToRadiology')}
+                      </button>
+                      <button
+                        type="button" disabled={busy}
+                        onClick={() => orderMut.mutate('ECO')}
+                        className="flex-1 rounded-md border border-ink-200 px-2 py-1.5 text-[11px] font-medium hover:bg-ink-50 disabled:opacity-50"
+                        data-testid="order-ECO"
+                      >
+                        {t('premature.orders.sendToEco')}
+                      </button>
+                    </div>
+                    <ul className="mt-1.5 space-y-1" data-testid="order-list">
+                      {(ordersQuery.data ?? []).length === 0 ? (
+                        <li className="text-[11px] text-ink-400">{t('premature.orders.none')}</li>
+                      ) : (
+                        (ordersQuery.data ?? []).map((o) => (
+                          <li
+                            key={o.visitId}
+                            className="flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 text-[11px] text-ink-700"
+                            data-testid={`order-row-${o.visitType}`}
+                          >
+                            <FlaskConical size={11} className="shrink-0 text-ink-400" />
+                            <span className="font-mono">{o.visitDisplayId}</span>
+                            <span className="text-ink-400">·</span>
+                            <span>{o.visitType}</span>
+                            <span className="text-ink-400">·</span>
+                            <span className="font-medium">{o.status}</span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Discharge note */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink-600">{t('premature.dischargeNote.label')}</label>
+                    <textarea
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder={t('premature.dischargeNote.placeholder')}
+                      rows={2}
+                      className="mt-1 w-full rounded-md border border-ink-200 px-2 py-1.5 text-xs"
+                      data-testid="discharge-note-input"
+                    />
+                    <button
+                      type="button" disabled={busy}
+                      onClick={() => noteMut.mutate()}
+                      className="mt-1 w-full rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium hover:bg-ink-50 disabled:opacity-50"
+                      data-testid="discharge-note-save"
+                    >
+                      {t('premature.dischargeNote.save')}
+                    </button>
+                  </div>
+
                   <div>
                     <label className="block text-[11px] font-medium text-ink-600">{t('premature.detail.extendBy')}</label>
                     <div className="mt-1 flex gap-1.5">
@@ -180,7 +316,7 @@ export function BedDetailPanel({
                         <option value="HOURS">{t('premature.hours')}</option>
                       </select>
                       <button
-                        type="button" disabled={pending}
+                        type="button" disabled={busy}
                         onClick={() => onExtend({ id: admission.id, value: extendValue, unit: extendUnit })}
                         className="flex-1 rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium hover:bg-ink-50 disabled:opacity-50"
                         data-testid="detail-extend"
@@ -190,7 +326,7 @@ export function BedDetailPanel({
                     </div>
                   </div>
                   <button
-                    type="button" disabled={pending} onClick={() => onFinish(admission.id)}
+                    type="button" disabled={busy} onClick={() => finishMut.mutate({ override: false })}
                     className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                     data-testid="detail-finish"
                   >
@@ -220,6 +356,48 @@ export function BedDetailPanel({
           </>
         )}
       </div>
+
+      {pendingMsg !== null && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 p-4">
+          <div
+            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
+            data-testid="results-pending-dialog"
+            role="alertdialog"
+            aria-modal="true"
+          >
+            <h3 className="text-sm font-semibold text-ink-900">{t('premature.resultsPending.title')}</h3>
+            <p className="mt-2 text-xs text-ink-600">{t('premature.resultsPending.body')}</p>
+            <p className="mt-1 text-xs text-amber-700">{pendingMsg}</p>
+            <label className="mt-3 block text-[11px] font-medium text-ink-600">{t('premature.resultsPending.reason')}</label>
+            <input
+              type="text"
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              className="mt-1 w-full rounded-md border border-ink-200 px-2 py-1.5 text-sm"
+              data-testid="override-reason"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setPendingMsg(null); setOverrideReason(''); }}
+                className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium hover:bg-ink-50"
+                data-testid="results-pending-cancel"
+              >
+                {t('common.close')}
+              </button>
+              <button
+                type="button"
+                disabled={busy || overrideReason.trim().length === 0}
+                onClick={() => finishMut.mutate({ override: true, reason: overrideReason })}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                data-testid="finish-override"
+              >
+                {t('premature.resultsPending.finishAnyway')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

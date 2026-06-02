@@ -59,6 +59,7 @@ export type Case = {
   closedAt: string | null;
   initialPaymentId: string | null;
   finalPaymentId: string | null;
+  dischargeNote?: string | null;
 };
 
 export type EmergencyVisit = {
@@ -120,8 +121,32 @@ export async function extendStay(caseId: string, value: number, unit: StayUnit):
   return res.data;
 }
 
-export async function finishTreatment(caseId: string): Promise<Case> {
-  const res = await api.post(`/emergency/cases/${caseId}/finish-treatment`, {});
+export async function finishTreatment(caseId: string, override = false, overrideReason?: string): Promise<Case> {
+  const res = await api.post(`/emergency/cases/${caseId}/finish-treatment`, { override, overrideReason });
+  return res.data;
+}
+
+export type Order = {
+  visitId: string;
+  visitDisplayId: string;
+  visitType: string;
+  status: string;
+  resultsSummary?: string | null;
+  startedAt: string;
+};
+
+export async function listOrders(caseId: string): Promise<Order[]> {
+  const res = await api.get(`/emergency/cases/${caseId}/orders`);
+  return res.data;
+}
+
+export async function orderWorkup(caseId: string, targetType: 'LABORATORY' | 'RADIOLOGY' | 'ECO'): Promise<Order> {
+  const res = await api.post(`/emergency/cases/${caseId}/orders`, { targetType });
+  return res.data;
+}
+
+export async function setDischargeNote(caseId: string, note: string): Promise<Case> {
+  const res = await api.post(`/emergency/cases/${caseId}/discharge-note`, { note });
   return res.data;
 }
 
