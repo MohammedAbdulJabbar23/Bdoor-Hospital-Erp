@@ -168,6 +168,22 @@ export default {
     startVisitHint: 'Direct walk-in for non-doctor departments. For doctor consultations, use the Appointments page.',
     error: 'Could not register patient: {{message}}',
   },
+  departments: {
+    incomingTitle: 'Incoming — open a case',
+    incomingWaiting_one: '{{count}} visit waiting for service selection',
+    incomingWaiting_other: '{{count}} visits waiting for service selection',
+    casesActive: 'Active cases',
+    casesAll: 'All cases',
+    showActiveOnly: 'Active only',
+    showAll: 'Show all',
+    countActive_one: '{{count}} active case',
+    countActive_other: '{{count}} active cases',
+    countAll_one: '{{count}} case',
+    countAll_other: '{{count}} cases',
+    noActive: 'No active cases',
+    noActiveHint: 'Cases will appear here once services are assigned.',
+    pageRange: '{{from}}–{{to}} of {{total}}',
+  },
   premature: {
     title: 'Premature unit',
     subtitle: 'Admit infants, manage beds and period of stay, and discharge.',
@@ -198,6 +214,12 @@ export default {
       AVAILABLE: 'Available',
       PENDING_PAYMENT: 'Pending payment',
       OCCUPIED: 'Occupied',
+    },
+    filter: {
+      all: 'All',
+      available: 'Available',
+      pending: 'Pending payment',
+      occupied: 'Occupied',
     },
     admissionStatus: {
       AWAITING_ADMISSION_PAYMENT: 'Awaiting admission payment',
@@ -304,6 +326,12 @@ export default {
       AVAILABLE: 'Available',
       PENDING_PAYMENT: 'Pending payment',
       OCCUPIED: 'Occupied',
+    },
+    filter: {
+      all: 'All',
+      available: 'Available',
+      pending: 'Pending payment',
+      occupied: 'Occupied',
     },
     caseStatus: {
       AWAITING_INITIAL_PAYMENT: 'Awaiting initial payment',

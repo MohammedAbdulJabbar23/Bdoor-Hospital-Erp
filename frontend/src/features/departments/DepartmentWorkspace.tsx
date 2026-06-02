@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   ListOrdered, FlaskConical, Scan, HeartPulse, ChevronRight, Plus, X,
-  CheckCircle2, Receipt, Clock, ArrowLeft, Printer, type LucideIcon,
+  CheckCircle2, Receipt, Clock, ArrowLeft, Printer,
+  ChevronLeft, ChevronRight as ChevronRightPag, type LucideIcon,
 } from 'lucide-react';
 import { printResults } from '@/shared/print/ResultsPrintout';
 import { Button } from '@/shared/ui/Button';
@@ -43,8 +45,16 @@ const STATUS_TONE: Record<CaseStatus, { tone: 'neutral'|'info'|'success'|'warnin
   CANCELLED:         { tone: 'neutral', label: 'Cancelled' },
 };
 
+/** Terminal/closed statuses excluded by the default "active only" view. */
+const TERMINAL_STATUSES: ReadonlySet<CaseStatus> = new Set<CaseStatus>(['CLOSED', 'RETURNED', 'CANCELLED']);
+
+const PAGE_SIZE = 20;
+
 export function DepartmentWorkspace({ config }: { config: Config }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<DepartmentCase | null>(null);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
 
   const { data: cases, isLoading } = useQuery({
@@ -64,6 +74,23 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
     const caseVisits = new Set(cases.map((c) => c.visitId));
     return incoming.filter((v) => !caseVisits.has(v.id));
   }, [incoming, cases]);
+
+  // Default view: only ACTIVE/open cases (exclude finalized/closed/returned/cancelled),
+  // sorted newest-first so freshly-arrived/forwarded cases land on page 1.
+  const filteredCases = useMemo(() => {
+    const list = (cases ?? []).filter((c) => activeOnly ? !TERMINAL_STATUSES.has(c.status) : true);
+    return [...list].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  }, [cases, activeOnly]);
+
+  const totalCases = filteredCases.length;
+  const pageCount = Math.max(1, Math.ceil(totalCases / PAGE_SIZE));
+  // Keep the current page within bounds when the filtered list shrinks.
+  useEffect(() => {
+    if (page > pageCount - 1) setPage(pageCount - 1);
+  }, [page, pageCount]);
+  const safePage = Math.min(page, pageCount - 1);
+  const pageStart = safePage * PAGE_SIZE;
+  const pagedCases = filteredCases.slice(pageStart, pageStart + PAGE_SIZE);
 
   const Icon = config.icon;
   return (
@@ -107,19 +134,55 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
           )}
 
           <Card>
-            <div className="flex items-center gap-3 border-b border-ink-100 px-5 py-4">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                <Icon size={16} />
-              </span>
-              <div>
-                <h3 className="text-sm font-semibold text-ink-900">Active cases</h3>
-                <p className="text-xs text-ink-500">{cases ? `${cases.length} case${cases.length === 1 ? '' : 's'}` : ''}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+                  <Icon size={16} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-ink-900">
+                    {activeOnly ? t('departments.casesActive') : t('departments.casesAll')}
+                  </h3>
+                  <p className="text-xs text-ink-500">
+                    {cases
+                      ? activeOnly
+                        ? t('departments.countActive', { count: totalCases })
+                        : t('departments.countAll', { count: totalCases })
+                      : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-1 rounded-lg bg-ink-50 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => { setActiveOnly(true); setPage(0); }}
+                  aria-pressed={activeOnly}
+                  data-testid="dept-filter-active"
+                  className={
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition ' +
+                    (activeOnly ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-900')
+                  }
+                >
+                  {t('departments.showActiveOnly')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveOnly(false); setPage(0); }}
+                  aria-pressed={!activeOnly}
+                  data-testid="dept-filter-all"
+                  className={
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition ' +
+                    (!activeOnly ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-900')
+                  }
+                >
+                  {t('departments.showAll')}
+                </button>
               </div>
             </div>
             {isLoading ? (
               <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
-            ) : !cases || cases.length === 0 ? (
-              <EmptyState icon={Icon} title="No active cases" description="Cases will appear here once services are assigned." />
+            ) : totalCases === 0 ? (
+              <EmptyState icon={Icon} title={t('departments.noActive')} description={t('departments.noActiveHint')} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -134,7 +197,7 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
-                    {cases.map((c) => (
+                    {pagedCases.map((c) => (
                       <tr key={c.id} className="hover:bg-ink-50/60">
                         <Td>
                           <span className="font-mono text-xs font-semibold text-ink-900">{c.visitDisplayId}</span>
@@ -171,6 +234,37 @@ export function DepartmentWorkspace({ config }: { config: Config }) {
                     ))}
                   </tbody>
                 </table>
+                {pageCount > 1 && (
+                  <div className="flex items-center justify-between gap-3 border-t border-ink-100 px-5 py-3" data-testid="dept-pagination">
+                    <span className="text-xs text-ink-500" data-testid="dept-page-range">
+                      {t('departments.pageRange', {
+                        from: pageStart + 1,
+                        to: Math.min(pageStart + PAGE_SIZE, totalCases),
+                        total: totalCases,
+                      })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPage((p) => Math.max(0, p - 1))}
+                        disabled={safePage === 0}
+                        data-testid="dept-page-prev"
+                        className="inline-flex items-center gap-1 rounded-md border border-ink-200 px-2 py-1 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        <ChevronLeft size={12} className="rtl:rotate-180" /> {t('common.previous')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                        disabled={safePage >= pageCount - 1}
+                        data-testid="dept-page-next"
+                        className="inline-flex items-center gap-1 rounded-md border border-ink-200 px-2 py-1 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        {t('common.next')} <ChevronRightPag size={12} className="rtl:rotate-180" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </Card>

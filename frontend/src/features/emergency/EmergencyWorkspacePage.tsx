@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Siren, BedDouble, Clock, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
+import { BedStatusFilter, type BedFilter } from '@/features/beds/BedStatusFilter';
 import { BedDetailPanel } from './BedDetailPanel';
 import {
   listBeds, listCases, listIncomingEmergency, admitPatient, extendStay,
@@ -21,6 +22,7 @@ export function EmergencyWorkspacePage() {
   const qc = useQueryClient();
   const [admitFor, setAdmitFor] = useState<EmergencyVisit | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [bedFilter, setBedFilter] = useState<BedFilter>('ALL');
 
   const { data: beds } = useQuery({ queryKey: ['emerg-beds'], queryFn: listBeds, refetchInterval: 15000 });
   const { data: cases } = useQuery({
@@ -54,6 +56,21 @@ export function EmergencyWorkspacePage() {
       setSelectedCaseId(null);
     }
   }, [cases, selectedCaseId]);
+
+  // Client-side status filter over the already-fetched beds. Default ALL shows every bed.
+  const bedCounts = useMemo(() => {
+    const all = beds ?? [];
+    return {
+      ALL: all.length,
+      AVAILABLE: all.filter((b) => b.status === 'AVAILABLE').length,
+      PENDING_PAYMENT: all.filter((b) => b.status === 'PENDING_PAYMENT').length,
+      OCCUPIED: all.filter((b) => b.status === 'OCCUPIED').length,
+    };
+  }, [beds]);
+  const visibleBeds = useMemo(
+    () => (beds ?? []).filter((b) => bedFilter === 'ALL' || b.status === bedFilter),
+    [beds, bedFilter],
+  );
 
   const invalidate = async () => {
     await Promise.all([
@@ -121,11 +138,12 @@ export function EmergencyWorkspacePage() {
 
       {/* Bed dashboard */}
       <section className="rounded-xl border border-ink-100 bg-white" data-testid="emerg-beds">
-        <div className="border-b border-ink-100 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-3">
           <h2 className="text-sm font-semibold text-ink-900">{t('emergency.bedDashboard')}</h2>
+          <BedStatusFilter ns="emergency" value={bedFilter} counts={bedCounts} onChange={setBedFilter} t={t} />
         </div>
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(beds ?? []).map((bed) => (
+          {visibleBeds.map((bed) => (
             <BedCard
               key={bed.id}
               bed={bed}

@@ -168,6 +168,22 @@ export default {
     startVisit: 'بدء زيارة',
     startVisitHint: 'زيارة مباشرة للأقسام غير الطبية. لاستشارات الأطباء استخدم صفحة المواعيد.',
   },
+  departments: {
+    incomingTitle: 'الواردة — فتح حالة',
+    incomingWaiting_one: 'زيارة واحدة بانتظار اختيار الخدمات',
+    incomingWaiting_other: '{{count}} زيارات بانتظار اختيار الخدمات',
+    casesActive: 'الحالات النشطة',
+    casesAll: 'كل الحالات',
+    showActiveOnly: 'النشطة فقط',
+    showAll: 'عرض الكل',
+    countActive_one: 'حالة نشطة واحدة',
+    countActive_other: '{{count}} حالات نشطة',
+    countAll_one: 'حالة واحدة',
+    countAll_other: '{{count}} حالات',
+    noActive: 'لا توجد حالات نشطة',
+    noActiveHint: 'ستظهر الحالات هنا بمجرد إسناد الخدمات.',
+    pageRange: '{{from}}–{{to}} من {{total}}',
+  },
   premature: {
     title: 'وحدة الخدج',
     subtitle: 'إدخال الرضّع، إدارة الأسرّة ومدة الإقامة، والخروج.',
@@ -198,6 +214,12 @@ export default {
       AVAILABLE: 'متاح',
       PENDING_PAYMENT: 'بانتظار الدفع',
       OCCUPIED: 'مشغول',
+    },
+    filter: {
+      all: 'الكل',
+      available: 'متاح',
+      pending: 'بانتظار الدفع',
+      occupied: 'مشغول',
     },
     admissionStatus: {
       AWAITING_ADMISSION_PAYMENT: 'بانتظار دفعة الإدخال',
@@ -304,6 +326,12 @@ export default {
       AVAILABLE: 'متاح',
       PENDING_PAYMENT: 'بانتظار الدفع',
       OCCUPIED: 'مشغول',
+    },
+    filter: {
+      all: 'الكل',
+      available: 'متاح',
+      pending: 'بانتظار الدفع',
+      occupied: 'مشغول',
     },
     caseStatus: {
       AWAITING_INITIAL_PAYMENT: 'بانتظار الدفعة الأولية',
