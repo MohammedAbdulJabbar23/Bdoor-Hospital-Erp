@@ -10,7 +10,7 @@ import {
  */
 
 test.describe('REC-002 Laboratory', () => {
-  test('§6.1 Direct visit origin: receptionist creates a direct LAB visit (DIRECT_RETURNING)', async () => {
+  test('§6.1 Direct visit origin: a brand-new patient\'s first direct LAB visit is DIRECT_NEW', async () => {
     const admin = await authedContext('admin');
     const patient = await registerPatient(admin);
 
@@ -20,7 +20,9 @@ test.describe('REC-002 Laboratory', () => {
     expect(res.status()).toBe(201);
     const v = await res.json();
     expect(v.visitType).toBe('LABORATORY');
-    expect(['DIRECT_NEW', 'DIRECT_RETURNING']).toContain(v.origin);
+    // Origin is derived server-side: a freshly-registered patient has no prior visits, so their
+    // first visit is DIRECT_NEW (it was previously, incorrectly, always DIRECT_RETURNING).
+    expect(v.origin).toBe('DIRECT_NEW');
     expect(v.parentVisitId).toBeNull();
     await admin.dispose();
   });
