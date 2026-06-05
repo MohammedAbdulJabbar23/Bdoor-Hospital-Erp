@@ -36,3 +36,15 @@ export async function createUser(body: {
   const res = await api.post('/users', body);
   return res.data;
 }
+
+export async function updateUser(
+  id: string,
+  body: { fullName: string; roles: Role[]; active: boolean },
+): Promise<AppUser> {
+  const res = await api.put(`/users/${id}`, body);
+  return res.data;
+}
+
+export async function resetUserPassword(id: string, newPassword: string): Promise<void> {
+  await api.post(`/users/${id}/password`, { newPassword });
+}

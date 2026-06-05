@@ -73,6 +73,26 @@ public class User extends AggregateRoot {
         this.active = false;
     }
 
+    public void activate() {
+        this.active = true;
+    }
+
+    /** Update the display name. The username (login key) is immutable and never changes here. */
+    public void rename(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            throw new DomainException("USER_FULLNAME_REQUIRED", "Full name is required");
+        }
+        this.fullName = fullName.trim();
+    }
+
+    /** Replace the user's role set. A user must always retain at least one role. */
+    public void replaceRoles(Set<Role> newRoles) {
+        if (newRoles == null || newRoles.isEmpty()) {
+            throw new DomainException("USER_ROLES_REQUIRED", "At least one role is required");
+        }
+        this.roles = new HashSet<>(newRoles);
+    }
+
     public void changePassword(String newPasswordHash) {
         if (newPasswordHash == null || newPasswordHash.isBlank()) {
             throw new DomainException("USER_PASSWORD_REQUIRED", "Password is required");
