@@ -15,10 +15,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -131,6 +134,28 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiError.of(400, "INVALID_REQUEST", "The request could not be processed."));
+    }
+
+    /** Wrong HTTP verb for an existing endpoint (e.g. DELETE on a GET/POST-only route) — 405. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(ApiError.of(405, "METHOD_NOT_ALLOWED",
+                        "The HTTP method is not supported for this endpoint."));
+    }
+
+    /**
+     * No controller/resource mapped to the requested path — 404. On Spring Boot 3.2+ an unmapped
+     * path is caught by the static-resource handler and surfaces as {@link NoResourceFoundException}
+     * (a {@code ServletException}) which would otherwise fall through to the 500 catch-all;
+     * {@link NoHandlerFoundException} covers the dispatcher path when
+     * {@code spring.mvc.throw-exception-if-no-handler-found=true}. Both map to the same clean 404 so
+     * static/SPA serving is untouched.
+     */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ApiError> handleNoHandler(Exception ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(404, "NOT_FOUND", "The requested resource was not found."));
     }
 
     @ExceptionHandler(Exception.class)

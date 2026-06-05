@@ -1,6 +1,11 @@
 spring:
   application:
     name: hms-app
+  mvc:
+    # Surface unmapped paths as NoHandlerFoundException so GlobalExceptionHandler can return a
+    # clean JSON 404 (code NOT_FOUND). Safe here: the SPA/static assets are served by Vite, not
+    # this backend, so there is no catch-all resource handler whose behaviour this would change.
+    throw-exception-if-no-handler-found: true
   datasource:
     url: ${HMS_DB_URL:jdbc:postgresql://localhost:5432/hms}
     username: ${HMS_DB_USER:hms}
