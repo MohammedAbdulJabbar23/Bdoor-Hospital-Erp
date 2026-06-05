@@ -197,7 +197,7 @@ export function PatientProfilePage() {
             </button>
           </div>
           <div className="flex flex-wrap gap-2 p-4">
-            {(['LABORATORY', 'RADIOLOGY', 'ECO', 'EMERGENCY', 'PREMATURE'] as VisitType[]).map((vt) => {
+            {(['LABORATORY', 'RADIOLOGY', 'ECO', 'EMERGENCY', 'PREMATURE', 'PHARMACY'] as VisitType[]).map((vt) => {
               const Icon = TYPE_ICON[vt];
               return (
                 <Button
