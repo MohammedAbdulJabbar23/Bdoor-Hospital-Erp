@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,32 @@ public interface PharmacyDispenseRepository extends JpaRepository<PharmacyDispen
     Page<PharmacyDispense> search(
             @Param("status") DispenseStatus status,
             Pageable pageable
+    );
+
+    /**
+     * Per-status dispense counts across the whole table, computed by the DB via GROUP BY — never by
+     * paging+summing — so the pharmacy-queue KPI tiles are correct regardless of how many dispenses
+     * exist (the row listing remains capped). Each row is {@code [DispenseStatus status, Long count]}.
+     */
+    @Query("""
+            SELECT d.status, COUNT(d) FROM PharmacyDispense d
+            GROUP BY d.status
+            """)
+    List<Object[]> countByStatusGrouped();
+
+    /**
+     * Number of dispenses handed over (status DISPENSED, by {@code givenAt}) in the given window.
+     * Drives the "Dispensed today" KPI — counting only dispenses actually given today, not every
+     * DISPENSED dispense ever.
+     */
+    @Query("""
+            SELECT COUNT(d) FROM PharmacyDispense d
+            WHERE d.status = com.albudoor.hms.pharmacy.domain.DispenseStatus.DISPENSED
+              AND d.givenAt >= :from AND d.givenAt < :to
+            """)
+    long countDispensedBetween(
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 
     /**

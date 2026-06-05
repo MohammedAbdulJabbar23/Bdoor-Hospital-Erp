@@ -55,6 +55,12 @@ export type Page<T> = {
   size: number;
 };
 
+/** Server-computed pharmacy-queue KPIs (DB-aggregated, not paged+summed). */
+export type DispenseSummary = {
+  byStatus: Partial<Record<DispenseStatus, number>>;
+  dispensedToday: number;
+};
+
 export async function searchDispenses(status: DispenseStatus | null, page = 0, size = 50): Promise<Page<Dispense>> {
   const params: Record<string, string | number> = { page, size };
   if (status) params.status = status;
@@ -64,6 +70,16 @@ export async function searchDispenses(status: DispenseStatus | null, page = 0, s
 
 export async function getDispense(id: string): Promise<Dispense> {
   const res = await api.get(`/dispenses/${id}`);
+  return res.data;
+}
+
+/**
+ * Server-side pharmacy-queue KPI summary: per-status totals + dispensed-today, computed by the DB
+ * (count/group-by), so the tiles are correct regardless of how many dispenses exist — unlike paging
+ * the capped 200-row listing and counting client-side.
+ */
+export async function dispenseSummary(): Promise<DispenseSummary> {
+  const res = await api.get('/dispenses/summary');
   return res.data;
 }
 

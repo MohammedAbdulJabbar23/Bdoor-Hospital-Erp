@@ -18,7 +18,7 @@ import { Input } from '@/shared/ui/Input';
 import { extractApiError } from '@/shared/api/client';
 import { cn } from '@/shared/ui/cn';
 import {
-  searchDispenses, chargeDispense, markGivenDispense, cancelDispense,
+  searchDispenses, dispenseSummary, chargeDispense, markGivenDispense, cancelDispense,
   Dispense, DispenseStatus,
 } from './api';
 
@@ -46,10 +46,17 @@ export function PharmacyQueuePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Single broad fetch — pharmacy throughput is low enough to filter client-side and group cleanly.
+  // Paginated row listing (capped at 200 server-side). Used only to render rows, NOT for KPI counts.
   const { data, isLoading } = useQuery({
     queryKey: ['dispenses-all'],
     queryFn: () => searchDispenses(null, 0, 200),
+    refetchInterval: 12000,
+  });
+
+  // Server-computed KPI counts (DB-aggregated) so the tiles stay correct beyond the 200-row cap.
+  const { data: summary } = useQuery({
+    queryKey: ['dispenses-summary'],
+    queryFn: () => dispenseSummary(),
     refetchInterval: 12000,
   });
 
@@ -84,19 +91,30 @@ export function PharmacyQueuePage() {
     return map;
   }, [filtered]);
 
-  // Today's dispensed (for the "Dispensed today" KPI).
-  const dispensedTodayCount = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return all.filter((d) => d.status === 'DISPENSED' && d.givenAt && new Date(d.givenAt) >= today).length;
-  }, [all]);
-
+  // KPI tile counts come from the SERVER summary (authoritative DB totals across the whole queue),
+  // so they're correct even past the 200-row listing cap. When a search query is active the summary
+  // can't reflect it (search is client-side over the loaded window), so fall back to the counts of
+  // the locally-filtered rows. "Dispensed today" always uses the date-scoped server count.
+  const searching = query.trim().length > 0;
+  const byStatus = summary?.byStatus ?? {};
+  const localCount = (k: GroupKey) => (groups.get(k) ?? []).length;
   const counts: Record<GroupKey, number> = {
-    PENDING:          (groups.get('PENDING')          ?? []).length,
-    AWAITING_PAYMENT: (groups.get('AWAITING_PAYMENT') ?? []).length,
-    READY_TO_GIVE:    (groups.get('READY_TO_GIVE')    ?? []).length,
-    DISPENSED:        (groups.get('DISPENSED')        ?? []).length,
-    CANCELLED:        (groups.get('CANCELLED')        ?? []).length,
+    PENDING:          searching ? localCount('PENDING')          : (byStatus.PENDING          ?? 0),
+    AWAITING_PAYMENT: searching ? localCount('AWAITING_PAYMENT') : (byStatus.AWAITING_PAYMENT ?? 0),
+    READY_TO_GIVE:    searching ? localCount('READY_TO_GIVE')    : (byStatus.READY_TO_GIVE    ?? 0),
+    DISPENSED:        searching ? localCount('DISPENSED')        : (byStatus.DISPENSED        ?? 0),
+    CANCELLED:        searching ? localCount('CANCELLED')        : (byStatus.CANCELLED        ?? 0),
   };
+
+  // Today's dispensed (for the "Dispensed today" KPI) — server date-scoped count, uncapped. While
+  // searching, fall back to the locally-loaded DISPENSED-today rows.
+  const dispensedTodayCount = useMemo(() => {
+    if (searching) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return all.filter((d) => d.status === 'DISPENSED' && d.givenAt && new Date(d.givenAt) >= today).length;
+    }
+    return summary?.dispensedToday ?? 0;
+  }, [all, summary, searching]);
 
   const fmt = useMemo(
     () => new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-IQ' : 'en-US', { maximumFractionDigits: 0 }),
@@ -157,7 +175,7 @@ export function PharmacyQueuePage() {
           value={dispensedTodayCount}
           active={groupFilter === 'DISPENSED'}
           onClick={() => setGroupFilter(groupFilter === 'DISPENSED' ? null : 'DISPENSED')}
-          hint={`${counts.DISPENSED} total in view`}
+          hint={`${counts.DISPENSED} dispensed all-time`}
         />
       </div>
 
