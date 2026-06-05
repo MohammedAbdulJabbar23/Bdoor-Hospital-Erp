@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.UUID;
@@ -70,6 +71,20 @@ class GlobalExceptionHandlerTest {
         assertThat(res.getBody().status()).isEqualTo(400);
         assertThat(res.getBody().code()).isEqualTo("INVALID_PARAMETER");
         assertThat(res.getBody().message()).doesNotContain("not-a-uuid");
+    }
+
+    @Test
+    void missingRequestParameter_maps_to_400_missingParameter_andNamesTheParam() {
+        // e.g. GET /api/dept-cases without the required `category` query param.
+        var ex = new MissingServletRequestParameterException("category", "DepartmentCategory");
+        ResponseEntity<ApiError> res = handler.handleMissingParam(ex);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(res.getBody()).isNotNull();
+        assertThat(res.getBody().status()).isEqualTo(400);
+        assertThat(res.getBody().code()).isEqualTo("MISSING_PARAMETER");
+        // The parameter name is safe to echo and helps the caller fix the request.
+        assertThat(res.getBody().message()).contains("category");
     }
 
     @Test

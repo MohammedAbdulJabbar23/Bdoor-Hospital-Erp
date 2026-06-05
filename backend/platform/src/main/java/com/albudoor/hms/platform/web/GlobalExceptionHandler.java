@@ -17,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -120,6 +121,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiError.of(400, "INVALID_PARAMETER", "A request parameter has an invalid value."));
+    }
+
+    /**
+     * A required query/request parameter is absent (e.g. {@code GET /api/dept-cases} without
+     * {@code category}). A malformed client request must be a 400, not fall through to the 500
+     * catch-all. The parameter name is safe to echo and helps the caller correct the request.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiError.of(400, "MISSING_PARAMETER",
+                        "Required request parameter is missing: " + ex.getParameterName()));
     }
 
     /** Database constraint breach (FK, unique, not-null). The DB message is not echoed. */

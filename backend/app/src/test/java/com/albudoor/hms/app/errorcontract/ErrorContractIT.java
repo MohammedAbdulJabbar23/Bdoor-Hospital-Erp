@@ -75,6 +75,19 @@ class ErrorContractIT extends IntegrationTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void missingRequiredQueryParam_yields_400_missingParameter_not_500() {
+        // GET /api/dept-cases declares @RequestParam("category") (required). Omitting it previously
+        // fell through to the 500 catch-all; it must now be a clean 400 naming the missing param.
+        ResponseEntity<Map> res = rest.exchange("/api/dept-cases", HttpMethod.GET,
+                new HttpEntity<>(auth("admin")), Map.class);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(code(res)).isEqualTo("MISSING_PARAMETER");
+        assertThat((String) res.getBody().get("message")).contains("category");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void malformedJson_body_yields_400_not_500() {
         // Raw, syntactically-broken JSON -> HttpMessageNotReadableException -> MALFORMED_REQUEST.
         HttpHeaders headers = auth("receptionist");
