@@ -31,16 +31,23 @@ export function Topbar() {
     enabled: !!user,
   });
 
+  // Surface the ORIGINATING visit that just received forwarded results — NOT the forwarded child
+  // (whose /clinical/exam page is empty). The parent keeps `endedAt` null while it's still in
+  // progress, so we key off `resultsLastUpdatedAt` (set whenever a child returns results) instead.
   const returnedNotifs = useMemo(() => {
     const all = visitsPage?.content ?? [];
     const cutoff = Date.now() - 24 * 60 * 60 * 1000; // last 24h
     return all
-      .filter((v) => v.resultsSummary && (v.endedAt ? Date.parse(v.endedAt) > cutoff : false))
-      .sort((a, b) => Date.parse(b.endedAt ?? '0') - Date.parse(a.endedAt ?? '0'))
+      .filter((v) =>
+        v.resultsSummary
+        && v.origin !== 'FORWARDED'
+        && v.resultsLastUpdatedAt != null
+        && Date.parse(v.resultsLastUpdatedAt) > cutoff)
+      .sort((a, b) => Date.parse(b.resultsLastUpdatedAt ?? '0') - Date.parse(a.resultsLastUpdatedAt ?? '0'))
       .slice(0, 8);
   }, [visitsPage]);
 
-  const unread = returnedNotifs.filter((v) => Date.parse(v.endedAt ?? '0') > lastSeenAt).length;
+  const unread = returnedNotifs.filter((v) => Date.parse(v.resultsLastUpdatedAt ?? '0') > lastSeenAt).length;
 
   const markSeen = () => {
     const now = Date.now();
@@ -191,7 +198,7 @@ export function Topbar() {
   );
 }
 
-const ORIGIN_ICON: Record<string, LucideIcon> = {
+const TYPE_ICON: Record<string, LucideIcon> = {
   LABORATORY: FlaskConical,
   RADIOLOGY: Scan,
   ECO: HeartPulse,
@@ -199,7 +206,10 @@ const ORIGIN_ICON: Record<string, LucideIcon> = {
 
 function NotifItem({ visit, onOpen }: { visit: Visit; onOpen: () => void }) {
   const { t } = useTranslation();
-  const Icon = ORIGIN_ICON[visit.visitType] ?? FlaskConical;
+  // The notification is on the ORIGINATING visit (e.g. a doctor consult). Use its own type icon
+  // when known, else a generic results icon. The label is dept-agnostic because the parent visit
+  // doesn't carry which child returned the results.
+  const Icon = TYPE_ICON[visit.visitType] ?? FlaskConical;
   return (
     <li>
       <button
@@ -214,7 +224,7 @@ function NotifItem({ visit, onOpen }: { visit: Visit; onOpen: () => void }) {
           <div className="truncate text-sm font-medium text-ink-900">
             {visit.patientName} <span className="text-ink-500">· {visit.visitDisplayId}</span>
           </div>
-          <div className="text-xs text-ink-500">{t('nav.resultsReceived', { dept: visit.visitType.toLowerCase() })}</div>
+          <div className="text-xs text-ink-500">{t('nav.resultsReturned')}</div>
           {visit.resultsSummary && (
             <div className="mt-1 line-clamp-2 rounded bg-ink-50 px-2 py-1 text-[11px] text-ink-700">
               {visit.resultsSummary}

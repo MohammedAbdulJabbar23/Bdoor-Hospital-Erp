@@ -40,6 +40,7 @@ export default {
     noNotifications: 'لا توجد إشعارات.',
     last24h: 'آخر 24 ساعة',
     resultsReceived: 'وردت النتائج من {{dept}}',
+    resultsReturned: 'عادت النتائج المُحالة إلى هذه الزيارة',
   },
   common: {
     save: 'حفظ',

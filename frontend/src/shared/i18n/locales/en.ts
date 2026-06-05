@@ -40,6 +40,7 @@ export default {
     noNotifications: 'No notifications.',
     last24h: 'Last 24h',
     resultsReceived: 'Results received from {{dept}}',
+    resultsReturned: 'Forwarded results returned to this visit',
   },
   common: {
     save: 'Save',

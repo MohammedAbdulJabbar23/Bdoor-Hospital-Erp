@@ -93,6 +93,15 @@ public class Visit extends AggregateRoot {
     @Column(name = "results_summary", length = 2000)
     private String resultsSummary;
 
+    /**
+     * When the {@code resultsSummary} was last (re)set by a returning forwarded child. Drives the
+     * Topbar notification bell's "results received within the last 24h" filter on the ORIGINATING
+     * visit — the parent's {@code endedAt} stays null while it is still in progress, so it cannot
+     * be used for that purpose.
+     */
+    @Column(name = "results_last_updated_at")
+    private Instant resultsLastUpdatedAt;
+
     public static Visit createDirect(
             String visitDisplayId,
             UUID patientId,
@@ -235,6 +244,7 @@ public class Visit extends AggregateRoot {
             return;
         }
         this.resultsSummary = summary;
+        this.resultsLastUpdatedAt = Instant.now();
         if (this.status == VisitStatus.AWAITING_RESULTS) {
             // Doctor "pause-and-wait" pattern: resume the parent.
             transitionTo(VisitStatus.IN_PROGRESS);
@@ -247,6 +257,14 @@ public class Visit extends AggregateRoot {
     public void completeForwardedWith(String summary) {
         if (this.parentVisitId == null) {
             throw new DomainException("NOT_FORWARDED", "Visit has no parent to return to");
+        }
+        // The department visit must have started (payment approved → IN_PROGRESS) before its
+        // results can be returned. Trying to return from CREATED/AWAITING_PAYMENT would otherwise
+        // surface the generic INVALID_VISIT_TRANSITION; give the caller a clear, actionable error.
+        if (this.status != VisitStatus.IN_PROGRESS) {
+            throw new DomainException("SUBVISIT_NOT_IN_PROGRESS",
+                    "Results can't be returned before the department visit is in progress "
+                            + "(its payment must be approved first).");
         }
         this.resultsSummary = summary;
         transitionTo(VisitStatus.COMPLETED);
