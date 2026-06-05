@@ -14,7 +14,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Skeleton } from '@/shared/ui/Skeleton';
-import { searchVisits, Visit, VisitType, VisitStatus } from './api';
+import { searchVisits, visitSummary, Visit, VisitType, VisitStatus } from './api';
 import { cn } from '@/shared/ui/cn';
 
 const TYPE_ICON: Record<VisitType, LucideIcon> = {
@@ -63,10 +63,17 @@ export function VisitQueuePage() {
   const [groupFilter, setGroupFilter] = useState<typeof STATUS_GROUPS[number]['key'] | null>(null);
   const [query, setQuery] = useState('');
 
-  // Fetch a generous page; visits are bounded enough to filter client-side.
+  // Paginated row listing (capped at 100 server-side). Used only to render rows, NOT for counts.
   const { data, isLoading } = useQuery({
     queryKey: ['visits-all', typeFilter],
     queryFn: () => searchVisits(typeFilter, null, 0, 100),
+    refetchInterval: 12000,
+  });
+
+  // Server-computed KPI/group counts (DB-aggregated) so tiles stay correct beyond the 100-row cap.
+  const { data: summary } = useQuery({
+    queryKey: ['visits-summary', typeFilter],
+    queryFn: () => visitSummary(typeFilter),
     refetchInterval: 12000,
   });
 
@@ -96,11 +103,36 @@ export function VisitQueuePage() {
     return map;
   }, [filtered]);
 
+  // Group counts come from the SERVER summary (authoritative totals across the whole queue),
+  // mapping per-status totals → status-groups client-side. When a search query is active the
+  // summary can't reflect it (search is client-side over the loaded window), so fall back to the
+  // counts of the locally-filtered rows. "Completed today" always uses the date-scoped server count.
+  const byStatus = summary?.byStatus ?? {};
+  const searching = query.trim().length > 0;
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const g of STATUS_GROUPS) out[g.key] = (groups.get(g.key) ?? []).length;
+    for (const g of STATUS_GROUPS) {
+      if (searching) {
+        out[g.key] = (groups.get(g.key) ?? []).length;
+      } else if (g.key === 'COMPLETED') {
+        out[g.key] = summary?.completedToday ?? 0;
+      } else {
+        out[g.key] = g.matches.reduce((sum, s) => sum + (byStatus[s] ?? 0), 0);
+      }
+    }
     return out;
-  }, [groups]);
+  }, [groups, summary, byStatus, searching]);
+
+  // "Total active" = every non-terminal visit in the system (server totals), or the filtered-row
+  // count while searching.
+  const totalActive = useMemo(() => {
+    if (searching) {
+      return filtered.filter((v) => v.status !== 'COMPLETED' && v.status !== 'CANCELLED').length;
+    }
+    return Object.entries(byStatus)
+      .filter(([s]) => s !== 'COMPLETED' && s !== 'CANCELLED')
+      .reduce((sum, [, n]) => sum + (n ?? 0), 0);
+  }, [filtered, byStatus, searching]);
 
   const dt = useMemo(
     () => new Intl.DateTimeFormat(i18n.language === 'ar' ? 'ar-IQ' : 'en-GB', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }),
@@ -134,7 +166,7 @@ export function VisitQueuePage() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiTile
           icon={ListOrdered} tone="brand" label={t('visitQueue.kpiTotalActive')}
-          value={filtered.filter((v) => v.status !== 'COMPLETED' && v.status !== 'CANCELLED').length}
+          value={totalActive}
           active={groupFilter === null}
           onClick={() => setGroupFilter(null)}
         />
@@ -210,14 +242,17 @@ export function VisitQueuePage() {
           <div>
             {visibleGroups.map((g) => {
               const rows = groups.get(g.key) ?? [];
-              if (rows.length === 0 && !g.defaultOpen && groupFilter == null) return null;
+              // Header count is the authoritative server total; rows are the (capped) loaded window.
+              const total = counts[g.key] ?? rows.length;
+              if (rows.length === 0 && total === 0 && !g.defaultOpen && groupFilter == null) return null;
               return (
                 <StatusGroup
                   key={g.key}
                   title={t(g.labelKey)}
                   description={g.descKey ? t(g.descKey) : ''}
                   tone={g.tone}
-                  count={rows.length}
+                  count={total}
+                  shown={rows.length}
                   rows={rows}
                   defaultOpen={g.defaultOpen}
                   onOpen={openVisit}
@@ -235,12 +270,13 @@ export function VisitQueuePage() {
 /* ============================================================== Status group ============================================================== */
 
 function StatusGroup({
-  title, description, tone, count, rows, defaultOpen, onOpen, dt,
+  title, description, tone, count, shown, rows, defaultOpen, onOpen, dt,
 }: {
   title: string;
   description: string;
   tone: 'danger' | 'warning' | 'info' | 'success' | 'neutral';
   count: number;
+  shown: number;
   rows: Visit[];
   defaultOpen: boolean;
   onOpen: (v: Visit) => void;
@@ -284,13 +320,20 @@ function StatusGroup({
       </button>
       {open && (
         rows.length === 0 ? (
-          <p className="px-5 pb-3 text-xs text-ink-500">{t('visitQueue.nothingInGroup')}</p>
+          <p className="px-5 pb-3 text-xs text-ink-500">
+            {count > 0 ? t('visitQueue.notInWindow', { count }) : t('visitQueue.nothingInGroup')}
+          </p>
         ) : (
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-ink-100">
-              {rows.map((v) => <Row key={v.id} v={v} onOpen={onOpen} dt={dt} />)}
-            </tbody>
-          </table>
+          <>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-ink-100">
+                {rows.map((v) => <Row key={v.id} v={v} onOpen={onOpen} dt={dt} />)}
+              </tbody>
+            </table>
+            {count > shown && (
+              <p className="px-5 py-2 text-xs text-ink-500">{t('visitQueue.showingOf', { shown, count })}</p>
+            )}
+          </>
         )
       )}
     </section>

@@ -38,6 +38,13 @@ export type Visit = {
   endedAt: string | null;
   closureReason: string | null;
   resultsSummary: string | null;
+  resultsLastUpdatedAt: string | null;
+};
+
+/** Server-computed visit-queue KPIs (DB-aggregated, not paged+summed). */
+export type VisitSummary = {
+  byStatus: Partial<Record<VisitStatus, number>>;
+  completedToday: number;
 };
 
 export type Page<T> = {
@@ -58,6 +65,18 @@ export async function searchVisits(
   if (type) params.type = type;
   if (status) params.status = status;
   const res = await api.get('/visits', { params });
+  return res.data;
+}
+
+/**
+ * Server-side visit-queue KPI summary: per-status totals + completed-today, computed by the DB
+ * (count/group-by), so the tiles are correct regardless of how many visits exist — unlike paging
+ * the capped 100-row listing and counting client-side.
+ */
+export async function visitSummary(type: VisitType | null = null): Promise<VisitSummary> {
+  const params: Record<string, string> = {};
+  if (type) params.type = type;
+  const res = await api.get('/visits/summary', { params });
   return res.data;
 }
 

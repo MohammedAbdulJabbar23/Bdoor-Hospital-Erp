@@ -451,6 +451,8 @@ export default {
     noMatch: 'No visits match "{{query}}".',
     noActive: 'No active visits in the system.',
     nothingInGroup: 'Nothing in this group.',
+    notInWindow: '{{count}} not shown here — refine filters or search to load them.',
+    showingOf: 'Showing {{shown}} of {{count}}.',
     fromOrigin: 'from {{origin}}',
     justNow: 'just now',
     group: {

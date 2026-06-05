@@ -451,6 +451,8 @@ export default {
     noMatch: 'لا توجد زيارات تطابق "{{query}}".',
     noActive: 'لا توجد زيارات نشطة في النظام.',
     nothingInGroup: 'لا يوجد شيء في هذه المجموعة.',
+    notInWindow: '{{count}} غير معروضة هنا — حسّن عوامل التصفية أو ابحث لتحميلها.',
+    showingOf: 'عرض {{shown}} من {{count}}.',
     fromOrigin: 'من {{origin}}',
     justNow: 'الآن',
     group: {
