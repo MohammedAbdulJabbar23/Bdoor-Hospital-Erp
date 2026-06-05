@@ -32,19 +32,28 @@ class VisitOriginIT extends IntegrationTest {
     }
 
     @Test
-    void origin_defaults_to_returning_but_can_be_set_new() {
+    void origin_is_derived_server_side_first_visit_new_then_returning() {
         var patient = post("/api/patients", Map.of(
                 "fullName", "Origin Test " + System.nanoTime(), "gender", "MALE",
                 "dateOfBirth", "1990-01-01",
                 "mobileNumber", "0772" + (System.nanoTime() % 10_000_000L), "vip", false), "receptionist");
 
-        var defaulted = post("/api/visits",
+        // A brand-new patient's FIRST visit is correctly DIRECT_NEW (was previously, wrongly,
+        // always DIRECT_RETURNING). The server derives this from prior-visit history.
+        var first = post("/api/visits",
                 Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist");
-        assertThat(defaulted.get("origin")).isEqualTo("DIRECT_RETURNING");
+        assertThat(first.get("origin")).isEqualTo("DIRECT_NEW");
 
-        var explicitNew = post("/api/visits",
+        // The SECOND visit for the same patient is DIRECT_RETURNING.
+        var second = post("/api/visits",
+                Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist");
+        assertThat(second.get("origin")).isEqualTo("DIRECT_RETURNING");
+
+        // Client-sent origin is IGNORED for direct creates: even asking for DIRECT_NEW on a
+        // patient who already has visits still yields the derived DIRECT_RETURNING.
+        var thirdForcedNew = post("/api/visits",
                 Map.of("patientId", patient.get("id"), "visitType", "PREMATURE", "origin", "DIRECT_NEW"),
                 "receptionist");
-        assertThat(explicitNew.get("origin")).isEqualTo("DIRECT_NEW");
+        assertThat(thirdForcedNew.get("origin")).isEqualTo("DIRECT_RETURNING");
     }
 }

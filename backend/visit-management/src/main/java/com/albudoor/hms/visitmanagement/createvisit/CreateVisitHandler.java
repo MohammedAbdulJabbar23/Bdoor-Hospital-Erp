@@ -2,6 +2,7 @@ package com.albudoor.hms.visitmanagement.createvisit;
 
 import com.albudoor.hms.patientregistry.domain.Patient;
 import com.albudoor.hms.patientregistry.infrastructure.PatientRepository;
+import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.visitmanagement.domain.Visit;
 import com.albudoor.hms.visitmanagement.domain.VisitOrigin;
@@ -36,13 +37,25 @@ public class CreateVisitHandler {
         Patient patient = patients.findById(cmd.patientId())
                 .orElseThrow(() -> new NotFoundException("Patient not found: " + cmd.patientId()));
 
+        // An archived patient is a closed record; reception must unarchive before starting a visit.
+        if (patient.isArchived()) {
+            throw new DomainException("PATIENT_ARCHIVED",
+                    "Cannot start a visit for an archived patient. Unarchive the patient first.");
+        }
+
+        // Derive new-vs-returning server-side: the FIRST visit a patient ever has is DIRECT_NEW,
+        // every subsequent direct visit is DIRECT_RETURNING. The client-sent origin is ignored for
+        // direct creates (forwarded sub-visits go through ForwardVisitHandler, not here).
+        boolean hasPriorVisit = !visits.findAllByPatientIdOrderByStartedAtDesc(patient.getId()).isEmpty();
+        VisitOrigin origin = hasPriorVisit ? VisitOrigin.DIRECT_RETURNING : VisitOrigin.DIRECT_NEW;
+
         Visit visit = Visit.createDirect(
                 idGenerator.next(),
                 patient.getId(),
                 patient.getMrn(),
                 patient.getFullName(),
                 cmd.visitType(),
-                cmd.origin() == null ? VisitOrigin.DIRECT_RETURNING : cmd.origin(),
+                origin,
                 cmd.assignedDoctorId()
         );
         Visit saved = visits.save(visit);

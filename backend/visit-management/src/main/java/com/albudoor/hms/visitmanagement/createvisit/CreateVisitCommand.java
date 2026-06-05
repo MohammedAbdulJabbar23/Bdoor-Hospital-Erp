@@ -7,8 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Create a direct visit. {@code origin} is optional; when null it defaults to
- * {@link VisitOrigin#DIRECT_RETURNING} for backward-compatibility.
+ * Create a direct visit. {@code origin} is accepted for backward-compatibility but IGNORED:
+ * the server derives new-vs-returning from whether the patient already has any visits
+ * (first ever → {@link VisitOrigin#DIRECT_NEW}, otherwise {@link VisitOrigin#DIRECT_RETURNING}).
  */
 public record CreateVisitCommand(
         @NotNull UUID patientId,
