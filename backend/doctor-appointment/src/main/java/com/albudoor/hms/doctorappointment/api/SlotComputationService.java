@@ -51,15 +51,20 @@ public class SlotComputationService {
         for (WeeklyHour wh : doctor.getWeeklyHours()) {
             if (wh.getDayOfWeek() != date.getDayOfWeek()) continue;
 
-            LocalTime cursor = wh.getStartTime();
             int slotMin = wh.getSlotMinutes();
-            while (cursor.plusMinutes(slotMin).compareTo(wh.getEndTime()) <= 0) {
-                LocalDateTime start = LocalDateTime.of(date, cursor);
+            if (slotMin <= 0) continue; // defensive: a non-positive step would never terminate
+
+            // Iterate on LocalDateTime, NOT LocalTime: LocalTime.plusMinutes() WRAPS past
+            // midnight, so a late-ending block (…→23:30→00:00) made this loop forever.
+            // LocalDateTime advances the calendar day, so the end check always terminates.
+            LocalDateTime start = LocalDateTime.of(date, wh.getStartTime());
+            LocalDateTime blockEnd = LocalDateTime.of(date, wh.getEndTime());
+            while (!start.plusMinutes(slotMin).isAfter(blockEnd)) {
                 // A slot is bookable only if no live appointment holds it AND it has not
                 // already elapsed (a slot whose start is in the past can never be booked).
                 boolean available = !takenStarts.contains(start) && !start.isBefore(now);
                 slots.add(new AppointmentSlot(start, slotMin, available));
-                cursor = cursor.plusMinutes(slotMin);
+                start = start.plusMinutes(slotMin);
             }
         }
         return slots;
