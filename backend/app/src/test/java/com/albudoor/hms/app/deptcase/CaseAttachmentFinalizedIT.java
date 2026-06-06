@@ -84,7 +84,7 @@ class CaseAttachmentFinalizedIT extends IntegrationTest {
                 UUID.fromString((String) visit.get("id")), (String) visit.get("visitDisplayId"),
                 VisitOrigin.DIRECT_NEW, null,
                 UUID.fromString((String) patient.get("id")),
-                (String) patient.get("mrn"), (String) patient.get("fullName"));
+                (String) patient.get("mrn"), (String) patient.get("fullName"), null);
         c.addService(CaseServiceLine.pending(serviceItemId, (String) item.get("code"),
                 "Complete Blood Count", new BigDecimal("5000")));
         c.linkPayment(UUID.fromString((String) payment.get("id")));

@@ -6,10 +6,11 @@ import java.util.UUID;
 
 public record OrderResponse(
         UUID visitId, String visitDisplayId, String visitType, String status,
-        String resultsSummary, Instant startedAt
+        String resultsSummary, Instant startedAt, String note, Instant resultsAt
 ) {
     public static OrderResponse from(Visit v) {
         return new OrderResponse(v.getId(), v.getVisitDisplayId(), v.getVisitType().name(),
-                v.getStatus().name(), v.getResultsSummary(), v.getStartedAt());
+                v.getStatus().name(), v.getResultsSummary(), v.getStartedAt(),
+                v.getReferralNote(), v.getResultsLastUpdatedAt());
     }
 }

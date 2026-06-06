@@ -88,15 +88,6 @@ public class EmergencyCase extends AggregateRoot {
         this.status = EmergencyCaseStatus.CANCELLED;
     }
 
-    public void extendStay(int value, StayUnit unit) {
-        if (status != EmergencyCaseStatus.UNDER_TREATMENT && status != EmergencyCaseStatus.TREATMENT_FINISHED) {
-            throw new DomainException("CASE_NOT_EXTENDABLE",
-                    "Can only extend while UNDER_TREATMENT or TREATMENT_FINISHED (status=" + status + ")");
-        }
-        if (value <= 0 || unit == null) throw new DomainException("STAY_VALUE_INVALID", "extension must be positive with a unit");
-        this.stayExpiresAt = this.stayExpiresAt.plus(value, unit.chronoUnit());
-    }
-
     public void finishTreatment() {
         require(EmergencyCaseStatus.UNDER_TREATMENT, "finish treatment");
         this.status = EmergencyCaseStatus.TREATMENT_FINISHED;

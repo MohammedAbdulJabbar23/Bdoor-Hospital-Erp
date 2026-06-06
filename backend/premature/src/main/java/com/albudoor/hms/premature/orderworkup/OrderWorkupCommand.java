@@ -3,4 +3,4 @@ package com.albudoor.hms.premature.orderworkup;
 import com.albudoor.hms.visitmanagement.domain.VisitType;
 import jakarta.validation.constraints.NotNull;
 
-public record OrderWorkupCommand(@NotNull VisitType targetType) {}
+public record OrderWorkupCommand(@NotNull VisitType targetType, String note) {}

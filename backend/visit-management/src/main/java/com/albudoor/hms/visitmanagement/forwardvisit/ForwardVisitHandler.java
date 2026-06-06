@@ -66,7 +66,8 @@ public class ForwardVisitHandler {
                 parent.getPatientName(),
                 cmd.targetType(),
                 parent.getId(),
-                parent.getVisitType()
+                parent.getVisitType(),
+                cmd.note()
         );
         visits.save(child);
         if (pauseParent) {

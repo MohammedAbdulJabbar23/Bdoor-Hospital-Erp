@@ -24,7 +24,8 @@ public record VisitResponse(
         Instant endedAt,
         String closureReason,
         String resultsSummary,
-        Instant resultsLastUpdatedAt
+        Instant resultsLastUpdatedAt,
+        String referralNote
 ) {
     public static VisitResponse from(Visit v) {
         return new VisitResponse(
@@ -33,6 +34,7 @@ public record VisitResponse(
                 v.getVisitType(), v.getOrigin(), v.getStatus(),
                 v.getParentVisitId(), v.getOriginatingType(), v.getAssignedDoctorId(),
                 v.getStartedAt(), v.getEndedAt(),
-                v.getClosureReason(), v.getResultsSummary(), v.getResultsLastUpdatedAt());
+                v.getClosureReason(), v.getResultsSummary(), v.getResultsLastUpdatedAt(),
+                v.getReferralNote());
     }
 }

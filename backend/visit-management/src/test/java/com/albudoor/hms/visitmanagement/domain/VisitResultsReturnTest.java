@@ -40,7 +40,7 @@ class VisitResultsReturnTest {
     void completeForwardedWith_whenChildStillCreated_throwsClearSubvisitError_notGenericTransition() {
         Visit parent = forwardedParentInProgress();
         Visit child = Visit.createForwarded("V-2", UUID.randomUUID(), "MRN1", "Pat",
-                VisitType.LABORATORY, parent.getId(), VisitType.PREMATURE);
+                VisitType.LABORATORY, parent.getId(), VisitType.PREMATURE, null);
         // Child is still CREATED (payment not approved) — returning results must fail with a
         // clear domain error, not the generic INVALID_VISIT_TRANSITION.
         assertThatThrownBy(() -> child.completeForwardedWith("results"))
@@ -53,7 +53,7 @@ class VisitResultsReturnTest {
     void completeForwardedWith_whenChildInProgress_completesNormally() {
         Visit parent = forwardedParentInProgress();
         Visit child = Visit.createForwarded("V-3", UUID.randomUUID(), "MRN1", "Pat",
-                VisitType.LABORATORY, parent.getId(), VisitType.PREMATURE);
+                VisitType.LABORATORY, parent.getId(), VisitType.PREMATURE, null);
         child.transitionTo(VisitStatus.AWAITING_PAYMENT);
         child.transitionTo(VisitStatus.IN_PROGRESS);
         child.pullDomainEvents();

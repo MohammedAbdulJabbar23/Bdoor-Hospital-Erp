@@ -42,7 +42,9 @@ public class OrderWorkupHandler {
             throw new DomainException("CASE_NOT_ORDERABLE",
                     "Can only order while UNDER_TREATMENT (status=" + c.getStatus() + ")");
         }
-        // Non-pausing forward: the case's visit stays IN_PROGRESS.
-        return forwardVisit.handle(c.getVisitId(), new ForwardVisitCommand(cmd.targetType()), false).child();
+        // Non-pausing forward: the case's visit stays IN_PROGRESS. The note travels to the
+        // forwarded child so the receiving department sees why the patient was sent.
+        return forwardVisit.handle(c.getVisitId(),
+                new ForwardVisitCommand(cmd.targetType(), cmd.note()), false).child();
     }
 }

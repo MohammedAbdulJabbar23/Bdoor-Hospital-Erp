@@ -25,6 +25,7 @@ public record DepartmentCaseResponse(
         UUID paymentId,
         Instant finalizedAt,
         String resultsSummary,
+        String referralNote,
         Instant createdAt,
         List<Line> services
 ) {
@@ -62,6 +63,7 @@ public record DepartmentCaseResponse(
                 c.getPatientId(), c.getPatientMrn(), c.getPatientName(),
                 c.getStatus(), c.getPaymentId(),
                 c.getFinalizedAt(), c.getResultsSummary(),
+                c.getReferralNote(),
                 c.getCreatedAt(),
                 lines);
     }

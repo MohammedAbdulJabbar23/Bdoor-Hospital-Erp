@@ -102,6 +102,14 @@ public class Visit extends AggregateRoot {
     @Column(name = "results_last_updated_at")
     private Instant resultsLastUpdatedAt;
 
+    /**
+     * Free-text note captured when this visit was created as a forward/order — i.e. why the
+     * patient was sent to this department. Null for direct visits. Shown to the receiving
+     * department and on the originating case's order list.
+     */
+    @Column(name = "referral_note", length = 2000)
+    private String referralNote;
+
     public static Visit createDirect(
             String visitDisplayId,
             UUID patientId,
@@ -128,7 +136,8 @@ public class Visit extends AggregateRoot {
             String patientName,
             VisitType targetType,
             UUID parentVisitId,
-            VisitType originatingType
+            VisitType originatingType,
+            String referralNote
     ) {
         if (parentVisitId == null) {
             throw new DomainException("PARENT_REQUIRED", "parentVisitId is required for forwarded visits");
@@ -141,6 +150,7 @@ public class Visit extends AggregateRoot {
                 targetType, VisitOrigin.FORWARDED);
         v.parentVisitId = parentVisitId;
         v.originatingType = originatingType;
+        v.referralNote = (referralNote == null || referralNote.isBlank()) ? null : referralNote.trim();
         v.registerEvent(VisitCreatedEvent.of(v));
         return v;
     }

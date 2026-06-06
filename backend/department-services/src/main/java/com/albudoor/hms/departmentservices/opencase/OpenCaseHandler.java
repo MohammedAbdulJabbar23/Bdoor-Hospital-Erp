@@ -72,7 +72,8 @@ public class OpenCaseHandler {
                         cmd.category(),
                         visit.getId(), visit.getVisitDisplayId(),
                         visit.getOrigin(), visit.getParentVisitId(),
-                        visit.getPatientId(), visit.getPatientMrn(), visit.getPatientName())));
+                        visit.getPatientId(), visit.getPatientMrn(), visit.getPatientName(),
+                        visit.getReferralNote())));
 
         // Append the requested service lines.
         for (OpenCaseCommand.Service in : cmd.services()) {

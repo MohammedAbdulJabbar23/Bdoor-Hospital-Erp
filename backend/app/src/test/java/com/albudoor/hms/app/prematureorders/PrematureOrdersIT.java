@@ -169,6 +169,29 @@ class PrematureOrdersIT extends IntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void order_withNote_visibleOnOrderList_andReceivingDeptCase() {
+        String[] s = admitUnderCare();
+        String admissionId = s[0];
+        String note = "r/o sepsis - CBC + CRP, urgent";
+
+        Map<?, ?> order = post("/api/premature/admissions/" + admissionId + "/orders",
+                Map.of("targetType", "LABORATORY", "note", note), "premature", Map.class);
+        String childVisitId = (String) order.get("visitId");
+        assertThat(order.get("note")).isEqualTo(note);
+
+        // Sending side: the order list carries the note.
+        assertThat(listOrders(admissionId).get(0).get("note")).isEqualTo(note);
+
+        // Receiving side: opening the LAB case on the forwarded child surfaces the same note.
+        Map<String, Object> deptCase = post("/api/dept-cases/open",
+                Map.of("category", "LAB", "visitId", childVisitId,
+                        "services", List.of(Map.of("serviceItemId", aLabServiceItemId(), "quantity", 1))),
+                "lab", Map.class);
+        assertThat(deptCase.get("referralNote")).isEqualTo(note);
+    }
+
+    @Test
     void finish_blockedWhileOrderOpen() {
         String[] s = admitUnderCare();
         String admissionId = s[0];

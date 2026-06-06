@@ -246,6 +246,30 @@ class EmergencyOrdersIT extends IntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void order_withNote_visibleOnOrderList() {
+        String[] s = admitUnderTreatment();
+        String caseId = s[0];
+        String note = "chest film - r/o pneumonia";
+
+        Map<?, ?> order = post("/api/emergency/cases/" + caseId + "/orders",
+                Map.of("targetType", "RADIOLOGY", "note", note), "emergency", Map.class);
+        assertThat(order.get("note")).isEqualTo(note);
+        assertThat(listOrders(caseId).get(0).get("note")).isEqualTo(note);
+    }
+
+    /** Emergency must NOT support extend-stay (removed); the endpoint is gone. */
+    @Test
+    void extendStay_endpoint_removed() {
+        String[] s = admitUnderTreatment();
+        String caseId = s[0];
+
+        ResponseEntity<Map> res = postRaw("/api/emergency/cases/" + caseId + "/extend-stay",
+                Map.of("value", 1, "unit", "HOURS"), "emergency");
+        assertThat(res.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
     void order_wrongRole_forbidden() {
         String[] s = admitUnderTreatment();
         String caseId = s[0];

@@ -53,17 +53,6 @@ class EmergencyCaseTest {
     }
 
     @Test
-    void extend_pushes_expiry_only_under_treatment() {
-        EmergencyCase c = open(StayUnit.DAYS, 1);
-        assertThatThrownBy(() -> c.extendStay(1, StayUnit.DAYS)).isInstanceOf(DomainException.class);
-        c.linkInitialPayment(UUID.randomUUID());
-        c.markUnderTreatment();
-        var before = c.getStayExpiresAt();
-        c.extendStay(1, StayUnit.DAYS);
-        assertThat(c.getStayExpiresAt()).isEqualTo(before.plus(1, ChronoUnit.DAYS));
-    }
-
-    @Test
     void cancel_only_from_awaiting_initial_payment() {
         EmergencyCase c = open(StayUnit.DAYS, 1);
         c.cancel();

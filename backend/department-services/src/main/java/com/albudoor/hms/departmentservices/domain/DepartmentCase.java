@@ -90,6 +90,10 @@ public class DepartmentCase extends AggregateRoot {
     @Column(name = "results_summary", length = 4000)
     private String resultsSummary;
 
+    /** Snapshot of the originating visit's referral note (why the patient was sent here). */
+    @Column(name = "referral_note", length = 2000)
+    private String referralNote;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "department_case_service",
@@ -102,7 +106,8 @@ public class DepartmentCase extends AggregateRoot {
             DepartmentCategory category,
             UUID visitId, String visitDisplayId,
             VisitOrigin visitOrigin, UUID parentVisitId,
-            UUID patientId, String patientMrn, String patientName
+            UUID patientId, String patientMrn, String patientName,
+            String referralNote
     ) {
         if (visitOrigin == VisitOrigin.FORWARDED && parentVisitId == null) {
             throw new DomainException("PARENT_REQUIRED",
@@ -118,6 +123,7 @@ public class DepartmentCase extends AggregateRoot {
         c.patientId = patientId;
         c.patientMrn = patientMrn;
         c.patientName = patientName;
+        c.referralNote = referralNote;
         c.status = DepartmentCaseStatus.NEW;
         return c;
     }
