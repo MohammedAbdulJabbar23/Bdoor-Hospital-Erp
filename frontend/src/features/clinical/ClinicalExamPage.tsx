@@ -45,6 +45,8 @@ const COMMON_DIAGNOSES = [
 
 const ROUTES = ['oral', 'IV', 'IM', 'subcutaneous', 'topical', 'inhalation', 'rectal'];
 
+type ExamTab = 'consultation' | 'vitals' | 'diagnoses' | 'prescriptions' | 'orders' | 'record';
+
 /** Returns true when the BP / HR / etc. is outside a safe range; used for subtle UI warnings. */
 function vitalsOutOfRange(v: Vitals): { [k: string]: 'warn' | 'critical' | undefined } {
   const r: { [k: string]: 'warn' | 'critical' | undefined } = {};
@@ -90,6 +92,7 @@ export function ClinicalExamPage() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const lastSaveBody = useRef<string>('');
+  const [tab, setTab] = useState<ExamTab>('consultation');
 
   useEffect(() => {
     if (existingExam) {
@@ -284,88 +287,116 @@ export function ClinicalExamPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_400px] print-hide">
-        {/* ------------ Left: examination form ------------ */}
-        <div className="space-y-4">
-          <VitalsCard
-            vitals={vitals}
-            onChange={setVitals}
-            disabled={isFinalized}
-          />
+      {/* ------------ Quick actions ------------ */}
+      <div className="flex flex-wrap gap-2 print-hide">
+        <Button variant="secondary" onClick={() => window.print()}>
+          <Printer size={14} className="me-1.5" /> Print prescription
+        </Button>
+        {!isFinalized && exam && (
+          <Button
+            onClick={() => finalizeMut.mutate()}
+            disabled={finalizeMut.isPending || (diagnoses.length === 0 && !form.chiefComplaint)}
+          >
+            <CheckCircle2 size={14} className="me-1.5" />
+            {finalizeMut.isPending ? 'Finalizing…' : 'Finalize & complete visit'}
+          </Button>
+        )}
+      </div>
 
-          <Card>
-            <SectionHead icon={ClipboardList} title="Consultation" />
-            <div className="space-y-4 px-5 pb-5">
-              <Field label="Chief complaint" hint="Patient's reason for visit, in their own words.">
+      {/* ------------ Tabs (EncounterPage-style) ------------ */}
+      <div className="flex flex-wrap gap-1 border-b border-ink-100 print-hide">
+        {([
+          { key: 'consultation', label: 'Consultation' },
+          { key: 'vitals', label: 'Vitals' },
+          { key: 'diagnoses', label: 'Diagnoses', count: diagnoses.length },
+          { key: 'prescriptions', label: 'Prescriptions', count: prescriptions.length },
+          { key: 'orders', label: 'Orders', count: (children ?? []).length },
+          { key: 'record', label: 'Patient record' },
+        ] as { key: ExamTab; label: string; count?: number }[]).map((tb) => (
+          <button
+            key={tb.key}
+            type="button"
+            onClick={() => setTab(tb.key)}
+            className={cn(
+              'inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors',
+              tab === tb.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-600 hover:text-ink-900',
+            )}
+            data-testid={`exam-tab-${tb.key}`}
+          >
+            {tb.label}
+            {tb.count != null && tb.count > 0 && (
+              <span className="rounded-full bg-ink-100 px-1.5 text-[10px] font-semibold text-ink-600">{tb.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ------------ Tab content (each tab reuses the existing cards) ------------ */}
+      <div className="print-hide">
+        {tab === 'vitals' && (
+          <VitalsCard vitals={vitals} onChange={setVitals} disabled={isFinalized} />
+        )}
+
+        {tab === 'consultation' && (
+          <div className="space-y-4">
+            <Card>
+              <SectionHead icon={ClipboardList} title="Consultation" />
+              <div className="space-y-4 px-5 pb-5">
+                <Field label="Chief complaint" hint="Patient's reason for visit, in their own words.">
+                  <textarea
+                    className={textareaCls} rows={2} disabled={isFinalized}
+                    value={form.chiefComplaint ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, chiefComplaint: e.target.value }))}
+                    placeholder="e.g. Headache for 3 days"
+                  />
+                </Field>
+                <Field label="History of present illness">
+                  <textarea
+                    className={textareaCls} rows={3} disabled={isFinalized}
+                    value={form.historyOfPresentIllness ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, historyOfPresentIllness: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Examination notes">
+                  <textarea
+                    className={textareaCls} rows={4} disabled={isFinalized}
+                    value={form.examinationNotes ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, examinationNotes: e.target.value }))}
+                    placeholder="General appearance, system review, focused findings…"
+                  />
+                </Field>
+                <Field label="Plan">
+                  <textarea
+                    className={textareaCls} rows={3} disabled={isFinalized}
+                    value={form.plan ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value }))}
+                  />
+                </Field>
+              </div>
+            </Card>
+            <Card>
+              <SectionHead icon={Send} title="Referral instructions" />
+              <div className="px-5 pb-5">
                 <textarea
-                  className={textareaCls}
-                  rows={2}
-                  disabled={isFinalized}
-                  value={form.chiefComplaint ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, chiefComplaint: e.target.value }))}
-                  placeholder="e.g. Headache for 3 days"
+                  className={textareaCls} rows={2} disabled={isFinalized}
+                  value={form.referralInstructions ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, referralInstructions: e.target.value }))}
+                  placeholder="Notes for the receiving department; or follow-up instructions."
                 />
-              </Field>
-              <Field label="History of present illness">
-                <textarea
-                  className={textareaCls}
-                  rows={3}
-                  disabled={isFinalized}
-                  value={form.historyOfPresentIllness ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, historyOfPresentIllness: e.target.value }))}
-                />
-              </Field>
-              <Field label="Examination notes">
-                <textarea
-                  className={textareaCls}
-                  rows={4}
-                  disabled={isFinalized}
-                  value={form.examinationNotes ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, examinationNotes: e.target.value }))}
-                  placeholder="General appearance, system review, focused findings…"
-                />
-              </Field>
-              <Field label="Plan">
-                <textarea
-                  className={textareaCls}
-                  rows={3}
-                  disabled={isFinalized}
-                  value={form.plan ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value }))}
-                />
-              </Field>
-            </div>
-          </Card>
+              </div>
+            </Card>
+          </div>
+        )}
 
-          <DiagnosesCard
-            diagnoses={diagnoses}
-            onChange={setDiagnoses}
-            disabled={isFinalized}
-          />
+        {tab === 'diagnoses' && (
+          <DiagnosesCard diagnoses={diagnoses} onChange={setDiagnoses} disabled={isFinalized} />
+        )}
 
-          <PrescriptionsCard
-            prescriptions={prescriptions}
-            onChange={setPrescriptions}
-            disabled={isFinalized}
-          />
+        {tab === 'prescriptions' && (
+          <PrescriptionsCard prescriptions={prescriptions} onChange={setPrescriptions} disabled={isFinalized} />
+        )}
 
-          <Card>
-            <SectionHead icon={Send} title="Referral instructions" />
-            <div className="px-5 pb-5">
-              <textarea
-                className={textareaCls}
-                rows={2}
-                disabled={isFinalized}
-                value={form.referralInstructions ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, referralInstructions: e.target.value }))}
-                placeholder="Notes for the receiving department; or follow-up instructions."
-              />
-            </div>
-          </Card>
-        </div>
-
-        {/* ------------ Right: orders + tabbed patient record ------------ */}
-        <div className="space-y-4">
+        {tab === 'orders' && (
           <OrdersPanel
             visitId={visitId}
             children={children ?? []}
@@ -374,6 +405,9 @@ export function ClinicalExamPage() {
             disabled={isFinalized}
             dt={dt}
           />
+        )}
+
+        {tab === 'record' && (
           <PatientRecordPanel
             record={record}
             history={history}
@@ -381,7 +415,7 @@ export function ClinicalExamPage() {
             patientId={exam?.patientId}
             dt={dt}
           />
-        </div>
+        )}
       </div>
 
       {/* ------------ Print-only prescription page ------------ */}
@@ -407,26 +441,6 @@ export function ClinicalExamPage() {
         />
       )}
 
-      {/* ------------ Sticky footer action bar ------------ */}
-      {!isFinalized && exam && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-ink-200 bg-white/95 px-6 py-3 backdrop-blur ltr:ps-[252px] rtl:pe-[252px]">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => window.print()}
-            >
-              <Printer size={14} className="me-1.5" /> Print prescription
-            </Button>
-            <Button
-              onClick={() => finalizeMut.mutate()}
-              disabled={finalizeMut.isPending || diagnoses.length === 0 && !form.chiefComplaint}
-            >
-              <CheckCircle2 size={14} className="me-1.5" />
-              {finalizeMut.isPending ? 'Finalizing…' : 'Finalize & complete visit'}
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

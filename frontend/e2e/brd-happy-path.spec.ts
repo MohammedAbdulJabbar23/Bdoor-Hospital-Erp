@@ -127,25 +127,26 @@ test.describe('BRD happy path', () => {
     await login(page, 'doctor');
     await page.goto(`/clinical/exam/${consultVisitId}`);
 
-    // Wait for the form to be present
+    // Consultation is the default tab — the chief-complaint field is visible immediately.
     await expect(page.getByPlaceholder(/Headache for 3 days/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByPlaceholder(/Headache for 3 days/i).fill('Chest pain, intermittent over 3 days.');
 
-    // Vitals labels aren't htmlFor-bound; use the fixed input order inside the Vitals card
+    // Vitals tab. Labels aren't htmlFor-bound; use the fixed input order inside the Vitals card
     // 0=systolic, 1=diastolic, 2=heart rate, 3=resp rate, 4=temp, 5=spo2, 6=weight, 7=height
+    await page.getByTestId('exam-tab-vitals').click();
     const vitalsInputs = page.locator('input[type="number"]');
     await vitalsInputs.nth(0).fill('120');
     await vitalsInputs.nth(1).fill('80');
     await vitalsInputs.nth(2).fill('72');
     await vitalsInputs.nth(4).fill('36.8');
 
-    // Chief complaint
-    await page.getByPlaceholder(/Headache for 3 days/i).fill('Chest pain, intermittent over 3 days.');
-
-    // Add a custom diagnosis row, then fill its Description
+    // Diagnoses tab — add a custom diagnosis row, then fill its Description.
+    await page.getByTestId('exam-tab-diagnoses').click();
     await page.getByRole('button', { name: /Custom diagnosis/i }).click();
     await page.getByPlaceholder('Description').first().fill('Suspected angina pectoris');
 
-    // Forward to lab — first matching button is the forward action (other "Lab" is a record tab)
+    // Orders tab — forward to lab.
+    await page.getByTestId('exam-tab-orders').click();
     await page.getByRole('button', { name: /^Lab$/, exact: true }).first().click();
 
     // New: a "select tests" dialog opens. Skip test selection (lab will pick).
