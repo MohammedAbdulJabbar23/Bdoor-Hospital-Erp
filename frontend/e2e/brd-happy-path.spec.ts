@@ -147,7 +147,7 @@ test.describe('BRD happy path', () => {
 
     // Orders tab — forward to lab.
     await page.getByTestId('exam-tab-orders').click();
-    await page.getByRole('button', { name: /^Lab$/, exact: true }).first().click();
+    await page.getByTestId('forward-LABORATORY').click();
 
     // New: a "select tests" dialog opens. Skip test selection (lab will pick).
     await page.getByRole('button', { name: /Skip — let dept pick/i }).click();

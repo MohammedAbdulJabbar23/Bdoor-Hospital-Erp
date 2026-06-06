@@ -45,7 +45,8 @@ const COMMON_DIAGNOSES = [
 
 const ROUTES = ['oral', 'IV', 'IM', 'subcutaneous', 'topical', 'inhalation', 'rectal'];
 
-type ExamTab = 'consultation' | 'vitals' | 'diagnoses' | 'prescriptions' | 'orders' | 'record';
+type ExamTab = 'consultation' | 'vitals' | 'diagnoses' | 'prescriptions' | 'orders'
+  | 'lab' | 'radiology' | 'medications' | 'history';
 
 /** Returns true when the BP / HR / etc. is outside a safe range; used for subtle UI warnings. */
 function vitalsOutOfRange(v: Vitals): { [k: string]: 'warn' | 'critical' | undefined } {
@@ -159,6 +160,14 @@ export function ClinicalExamPage() {
     () => record ? { patientId: record.patientId, totalVisits: record.totalVisits, entries: record.visits } : undefined,
     [record],
   );
+  // Detailed clinical data for the dedicated Lab / Radiology / Medications tabs (across all visits).
+  const labCases = useMemo(() => (record?.departmentCases ?? []).filter((c) => c.category === 'LAB'), [record]);
+  const imagingCases = useMemo(
+    () => (record?.departmentCases ?? []).filter((c) => c.category === 'RADIOLOGY' || c.category === 'ECO'),
+    [record],
+  );
+  const dispenses = record?.pharmacyDispenses ?? [];
+  const meds = useMemo(() => deriveActiveMedications(history), [history]);
 
   // ---------- Child visits (forwarded orders) ----------------
   const { data: children } = useQuery({
@@ -311,7 +320,10 @@ export function ClinicalExamPage() {
           { key: 'diagnoses', label: 'Diagnoses', count: diagnoses.length },
           { key: 'prescriptions', label: 'Prescriptions', count: prescriptions.length },
           { key: 'orders', label: 'Orders', count: (children ?? []).length },
-          { key: 'record', label: 'Patient record' },
+          { key: 'lab', label: 'Lab', count: labCases.length },
+          { key: 'radiology', label: 'Radiology', count: imagingCases.length },
+          { key: 'medications', label: 'Medications', count: dispenses.length || meds.length },
+          { key: 'history', label: 'History' },
         ] as { key: ExamTab; label: string; count?: number }[]).map((tb) => (
           <button
             key={tb.key}
@@ -407,7 +419,28 @@ export function ClinicalExamPage() {
           />
         )}
 
-        {tab === 'record' && (
+        {tab === 'lab' && (
+          <Card>
+            <SectionHead icon={FlaskConical} title="Laboratory results" subtitle="All lab work for this patient — newest first. Expand a case for per-test values, ranges and flags." />
+            <div className="px-5 pb-5"><DeptCasesTab cases={labCases} kind="lab" dt={dt} /></div>
+          </Card>
+        )}
+
+        {tab === 'radiology' && (
+          <Card>
+            <SectionHead icon={Scan} title="Radiology & imaging reports" subtitle="Radiology and ECO studies with findings and impression." />
+            <div className="px-5 pb-5"><DeptCasesTab cases={imagingCases} kind="imaging" dt={dt} /></div>
+          </Card>
+        )}
+
+        {tab === 'medications' && (
+          <Card>
+            <SectionHead icon={Pill} title="Medication history" subtitle="Pharmacy dispenses and medications from past prescriptions." />
+            <div className="px-5 pb-5"><MedicationsTab dispenses={dispenses} meds={meds} dt={dt} /></div>
+          </Card>
+        )}
+
+        {tab === 'history' && (
           <PatientRecordPanel
             record={record}
             history={history}
@@ -813,9 +846,9 @@ function OrdersPanel({
       <div className="px-5 pb-3">
         {!disabled && (
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('LABORATORY')}>Lab</Button>
-            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('RADIOLOGY')}>Radiology</Button>
-            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('ECO')}>ECO</Button>
+            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('LABORATORY')} data-testid="forward-LABORATORY">Lab</Button>
+            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('RADIOLOGY')} data-testid="forward-RADIOLOGY">Radiology</Button>
+            <Button size="sm" variant="secondary" disabled={forwarding} onClick={() => onForward('ECO')} data-testid="forward-ECO">ECO</Button>
             {/* Phase-2 departments — BRD §6.7 promises these as forward options; surface as disabled
                 so doctors see the documented choice list and know what's coming. */}
             <Button size="sm" variant="secondary" disabled title="Coming in a later release">Emergency</Button>
@@ -961,7 +994,7 @@ function ForwardTestsDialog({
 
 /* ============================================================== Patient record (tabbed) ============================================================== */
 
-type RecordTab = 'summary' | 'diagnoses' | 'lab' | 'radiology' | 'medications' | 'vitals' | 'visits';
+type RecordTab = 'summary' | 'diagnoses' | 'vitals' | 'visits';
 
 function PatientRecordPanel({
   record, history, currentVisitId, patientId, dt,
@@ -974,14 +1007,6 @@ function PatientRecordPanel({
 }) {
   const [tab, setTab] = useState<RecordTab>('summary');
 
-  const labCases = useMemo(
-    () => (record?.departmentCases ?? []).filter((c) => c.category === 'LAB'),
-    [record],
-  );
-  const imagingCases = useMemo(
-    () => (record?.departmentCases ?? []).filter((c) => c.category === 'RADIOLOGY' || c.category === 'ECO'),
-    [record],
-  );
   const dispenses = record?.pharmacyDispenses ?? [];
   const problems = useMemo(() => deriveProblemList(history), [history]);
   const meds = useMemo(() => deriveActiveMedications(history), [history]);
@@ -991,9 +1016,6 @@ function PatientRecordPanel({
   const tabs: { key: RecordTab; label: string; count: number; icon: typeof Activity }[] = [
     { key: 'summary',     label: 'Summary',  count: 0, icon: ClipboardList },
     { key: 'diagnoses',   label: 'Diagnoses',count: problems.length, icon: FileText },
-    { key: 'lab',         label: 'Lab',      count: labCases.length, icon: FlaskConical },
-    { key: 'radiology',   label: 'Imaging',  count: imagingCases.length, icon: Scan },
-    { key: 'medications', label: 'Meds',     count: dispenses.length || meds.length, icon: Pill },
     { key: 'vitals',      label: 'Vitals',   count: trend.length, icon: Activity },
     { key: 'visits',      label: 'Visits',   count: otherVisits.length, icon: Stethoscope },
   ];
@@ -1006,7 +1028,7 @@ function PatientRecordPanel({
             <ClipboardList size={16} />
           </span>
           <div>
-            <h3 className="text-sm font-semibold text-ink-900">Patient record</h3>
+            <h3 className="text-sm font-semibold text-ink-900">History</h3>
             <p className="text-[11px] text-ink-500">{record?.totalVisits ?? '—'} total visits on file</p>
           </div>
         </div>
@@ -1053,12 +1075,6 @@ function PatientRecordPanel({
           <SummaryTab problems={problems} meds={meds} trend={trend} dispenses={dispenses} dt={dt} />
         ) : tab === 'diagnoses' ? (
           <DiagnosesTab problems={problems} dt={dt} />
-        ) : tab === 'lab' ? (
-          <DeptCasesTab cases={labCases} kind="lab" dt={dt} />
-        ) : tab === 'radiology' ? (
-          <DeptCasesTab cases={imagingCases} kind="imaging" dt={dt} />
-        ) : tab === 'medications' ? (
-          <MedicationsTab dispenses={dispenses} meds={meds} dt={dt} />
         ) : tab === 'vitals' ? (
           <VitalsTab trend={trend} dt={dt} />
         ) : (
