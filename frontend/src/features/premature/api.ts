@@ -109,6 +109,8 @@ export async function finishTreatment(admissionId: string, override = false, ove
   return res.data;
 }
 
+export type OrderTargetType = 'LABORATORY' | 'RADIOLOGY' | 'ECO';
+
 export type Order = {
   visitId: string;
   visitDisplayId: string;
@@ -116,6 +118,8 @@ export type Order = {
   status: string;
   resultsSummary?: string | null;
   startedAt: string;
+  note?: string | null;
+  resultsAt?: string | null;
 };
 
 export async function listOrders(admissionId: string): Promise<Order[]> {
@@ -123,8 +127,8 @@ export async function listOrders(admissionId: string): Promise<Order[]> {
   return res.data;
 }
 
-export async function orderWorkup(admissionId: string, targetType: 'LABORATORY' | 'RADIOLOGY' | 'ECO'): Promise<Order> {
-  const res = await api.post(`/premature/admissions/${admissionId}/orders`, { targetType });
+export async function orderWorkup(admissionId: string, targetType: OrderTargetType, note?: string): Promise<Order> {
+  const res = await api.post(`/premature/admissions/${admissionId}/orders`, { targetType, note });
   return res.data;
 }
 

@@ -99,6 +99,11 @@ export async function listCases(status?: CaseStatus): Promise<Case[]> {
   return res.data;
 }
 
+export async function getCase(id: string): Promise<Case> {
+  const res = await api.get(`/emergency/cases/${id}`);
+  return res.data;
+}
+
 /** Incoming queue = EMERGENCY visits not yet assigned a case (CREATED). */
 export async function listIncomingEmergency(): Promise<EmergencyVisit[]> {
   const res = await api.get('/visits', { params: { type: 'EMERGENCY', status: 'CREATED', size: 50 } });
@@ -116,15 +121,14 @@ export async function admitPatient(body: {
   return res.data;
 }
 
-export async function extendStay(caseId: string, value: number, unit: StayUnit): Promise<Case> {
-  const res = await api.post(`/emergency/cases/${caseId}/extend-stay`, { value, unit });
-  return res.data;
-}
+// Emergency does NOT support extend-stay (removed by design — emergency stays are not extended).
 
 export async function finishTreatment(caseId: string, override = false, overrideReason?: string): Promise<Case> {
   const res = await api.post(`/emergency/cases/${caseId}/finish-treatment`, { override, overrideReason });
   return res.data;
 }
+
+export type OrderTargetType = 'LABORATORY' | 'RADIOLOGY' | 'ECO';
 
 export type Order = {
   visitId: string;
@@ -133,6 +137,8 @@ export type Order = {
   status: string;
   resultsSummary?: string | null;
   startedAt: string;
+  note?: string | null;
+  resultsAt?: string | null;
 };
 
 export async function listOrders(caseId: string): Promise<Order[]> {
@@ -140,8 +146,8 @@ export async function listOrders(caseId: string): Promise<Order[]> {
   return res.data;
 }
 
-export async function orderWorkup(caseId: string, targetType: 'LABORATORY' | 'RADIOLOGY' | 'ECO'): Promise<Order> {
-  const res = await api.post(`/emergency/cases/${caseId}/orders`, { targetType });
+export async function orderWorkup(caseId: string, targetType: OrderTargetType, note?: string): Promise<Order> {
+  const res = await api.post(`/emergency/cases/${caseId}/orders`, { targetType, note });
   return res.data;
 }
 

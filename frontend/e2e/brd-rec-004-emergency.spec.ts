@@ -123,11 +123,10 @@ test.describe('REC-004 Emergency admission spine', () => {
     await admin.dispose(); await emergency.dispose(); await cashier.dispose();
   });
 
-  test('P8: nurse extends the emergency stay', async () => {
+  test('P8: emergency does NOT support extend-stay (endpoint removed)', async () => {
     const admin = await authedContext('admin');
     const emergency = await authedContext('emergency');
     const cashier = await authedContext('cashier');
-    const nurse = await authedContext('nurse');
 
     const { visit } = await startEmergencyVisit(admin);
     const bedId = await freshBed(emergency);
@@ -145,14 +144,13 @@ test.describe('REC-004 Emergency admission spine', () => {
       expect(cases.some((c: any) => c.id === emergCase.id)).toBeTruthy();
     }).toPass({ timeout: 10_000 });
 
-    const ext = await nurse.post(`${API_BASE}/emergency/cases/${emergCase.id}/extend-stay`, {
+    // Extend-stay was removed from Emergency by design — the endpoint no longer exists.
+    const ext = await emergency.post(`${API_BASE}/emergency/cases/${emergCase.id}/extend-stay`, {
       data: { value: 1, unit: 'DAYS' },
     });
-    expect(ext.ok()).toBeTruthy();
-    const after = await ext.json();
-    expect(new Date(after.stayExpiresAt).getTime()).toBeGreaterThan(new Date(emergCase.stayExpiresAt).getTime());
+    expect(ext.status()).toBe(404);
 
-    await admin.dispose(); await emergency.dispose(); await cashier.dispose(); await nurse.dispose();
+    await admin.dispose(); await emergency.dispose(); await cashier.dispose();
   });
 
   test('P9–P12a: finish treatment → final payment approved → case CLOSED, bed freed, visit COMPLETED', async () => {

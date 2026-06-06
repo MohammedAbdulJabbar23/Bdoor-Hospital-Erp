@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Siren, BedDouble, Clock, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { BedStatusFilter, type BedFilter } from '@/features/beds/BedStatusFilter';
-import { BedDetailPanel } from './BedDetailPanel';
 import {
-  listBeds, listCases, listIncomingEmergency, admitPatient, extendStay,
-  reissueDischargePayment, listEmergencyServices,
+  listBeds, listCases, listIncomingEmergency, admitPatient, listEmergencyServices,
   type Bed, type EmergencyVisit, type StayUnit, type EmergencyService,
 } from './api';
 
@@ -18,10 +17,10 @@ function isExpiringSoon(iso: string): boolean {
 }
 
 export function EmergencyWorkspacePage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [admitFor, setAdmitFor] = useState<EmergencyVisit | null>(null);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [bedFilter, setBedFilter] = useState<BedFilter>('ALL');
 
   const { data: beds } = useQuery({ queryKey: ['emerg-beds'], queryFn: listBeds, refetchInterval: 15000 });
@@ -40,22 +39,6 @@ export function EmergencyWorkspacePage() {
     () => (incoming ?? []).filter((v) => !admittedVisitIds.has(v.id)),
     [incoming, admittedVisitIds],
   );
-
-  // Drawer: full case + bed derived from already-loaded data (no extra fetch).
-  const selectedCase = useMemo(
-    () => (cases ?? []).find((c) => c.id === selectedCaseId) ?? null,
-    [cases, selectedCaseId],
-  );
-  const selectedBed = useMemo(
-    () => (beds ?? []).find((b) => b.occupant?.caseId === selectedCaseId) ?? null,
-    [beds, selectedCaseId],
-  );
-  // Auto-close when the selected case leaves the active set (e.g. discharged).
-  useEffect(() => {
-    if (selectedCaseId && cases && !cases.some((c) => c.id === selectedCaseId)) {
-      setSelectedCaseId(null);
-    }
-  }, [cases, selectedCaseId]);
 
   // Client-side status filter over the already-fetched beds. Default ALL shows every bed.
   const bedCounts = useMemo(() => {
@@ -81,19 +64,6 @@ export function EmergencyWorkspacePage() {
       qc.invalidateQueries({ queryKey: ['visits'] }),
     ]);
   };
-
-  const extendMut = useMutation({
-    mutationFn: ({ id, value, unit }: { id: string; value: number; unit: StayUnit }) =>
-      extendStay(id, value, unit),
-    onSuccess: async () => { toast.success(t('emergency.toast.extended')); await invalidate(); },
-    onError: (e) => toast.error(extractApiError(e)?.message ?? t('emergency.toast.error')),
-  });
-
-  const reissueMut = useMutation({
-    mutationFn: (id: string) => reissueDischargePayment(id),
-    onSuccess: async () => { toast.success(t('emergency.toast.reissued')); await invalidate(); },
-    onError: (e) => toast.error(extractApiError(e)?.message ?? t('emergency.toast.error')),
-  });
 
   return (
     <div className="space-y-6 p-1">
@@ -147,7 +117,7 @@ export function EmergencyWorkspacePage() {
             <BedCard
               key={bed.id}
               bed={bed}
-              onOpen={() => bed.occupant && setSelectedCaseId(bed.occupant.caseId)}
+              onOpen={() => bed.occupant && navigate(`/emergency/cases/${bed.occupant.caseId}`)}
               t={t}
             />
           ))}
@@ -164,18 +134,6 @@ export function EmergencyWorkspacePage() {
         />
       )}
 
-      {selectedBed && (
-        <BedDetailPanel
-          bed={selectedBed}
-          emergencyCase={selectedCase}
-          onClose={() => setSelectedCaseId(null)}
-          onExtend={extendMut.mutate}
-          onReissue={reissueMut.mutate}
-          pending={extendMut.isPending || reissueMut.isPending}
-          t={t}
-          dir={i18n.dir() === 'rtl' ? 'rtl' : 'ltr'}
-        />
-      )}
     </div>
   );
 }

@@ -4,11 +4,13 @@ import com.albudoor.hms.emergency.api.CaseResponse;
 import com.albudoor.hms.emergency.domain.EmergencyCaseStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController("emergencyListCasesController")
 @RequestMapping("/api/emergency/cases")
@@ -25,5 +27,10 @@ public class ListCasesController {
     public List<CaseResponse> list(
             @RequestParam(value = "status", required = false) EmergencyCaseStatus status) {
         return handler.list(status);
+    }
+
+    @GetMapping("/{id}")
+    public CaseResponse byId(@PathVariable UUID id) {
+        return handler.byId(id);
     }
 }

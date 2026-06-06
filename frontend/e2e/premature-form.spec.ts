@@ -24,10 +24,16 @@ async function seedUnderCare(): Promise<{ admissionId: string; bedCode: string }
   return { admissionId: adm.id, bedCode };
 }
 
+/** Open the Clinical tab → Form view. The premature Form + Tours now live under the Clinical tab. */
+async function openClinicalForm(page: import('@playwright/test').Page) {
+  await page.getByTestId('case-tab-clinical').click();
+  await page.getByTestId('clinical-form').click();
+}
+
 /** Fill all BRD-mandatory Premature Form fields and save; waits until the save lands
  *  (signatures render only once the form exists). Doesn't rely on registration pre-fill. */
 async function fillMandatoryForm(page: import('@playwright/test').Page) {
-  await page.getByTestId('case-tab-form').click();
+  await openClinicalForm(page);
   await page.getByTestId('f-ageText').fill('12 days');
   await page.getByTestId('f-birthWeightKg').fill('1.2');
   await page.getByTestId('f-currentWeightKg').fill('1.45');
@@ -50,9 +56,10 @@ test('premature staff fill the Premature Form and record a tour', async ({ page 
   await fillMandatoryForm(page);
 
   await page.reload();
+  await openClinicalForm(page);
   await expect(page.getByTestId('f-currentWeightKg')).toHaveValue('1.45');
 
-  await page.getByTestId('case-tab-tours').click();
+  await page.getByTestId('clinical-tours').click();
   await page.getByTestId('tour-respRate').fill('40');
   await page.getByTestId('tour-spo2').fill('96');
   await page.getByTestId('tour-pulse').fill('140');
@@ -88,12 +95,12 @@ test('premature staff draw and save a resident signature', async ({ page }) => {
   await expect(page.getByTestId('signature-RESIDENT').locator('img')).toBeVisible({ timeout: 10_000 });
 });
 
-test('the bed detail drawer links to the case page', async ({ page }) => {
+test('clicking the bed opens the case page with the clinical form', async ({ page }) => {
   const { admissionId, bedCode } = await seedUnderCare();
   await login(page, 'premature');
   await page.goto('/departments/premature');
   await page.getByTestId(`bed-${bedCode}`).click();
-  await page.getByTestId('bed-detail-open-case').click();
   await expect(page).toHaveURL(new RegExp(`/premature/admissions/${admissionId}`));
+  await openClinicalForm(page);
   await expect(page.getByTestId('prem-form')).toBeVisible();
 });

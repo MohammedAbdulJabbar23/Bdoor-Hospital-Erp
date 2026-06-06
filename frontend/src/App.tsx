@@ -25,6 +25,7 @@ import { PrematureWorkspacePage } from '@/features/premature/PrematureWorkspaceP
 import { BedAdminPage } from '@/features/premature/BedAdminPage';
 import { PrematureCasePage } from '@/features/premature/PrematureCasePage';
 import { EmergencyWorkspacePage } from '@/features/emergency/EmergencyWorkspacePage';
+import { EmergencyCasePage } from '@/features/emergency/EmergencyCasePage';
 import { BedAdminPage as EmergencyBedAdminPage } from '@/features/emergency/BedAdminPage';
 
 export default function App() {
@@ -102,6 +103,10 @@ export default function App() {
           <Route
             path="/emergency/beds"
             element={<RoleGate roles={['EMERGENCY_STAFF', 'ADMIN']}><EmergencyBedAdminPage /></RoleGate>}
+          />
+          <Route
+            path="/emergency/cases/:id"
+            element={<RoleGate roles={['EMERGENCY_STAFF', 'NURSE', 'DOCTOR', 'ADMIN']}><EmergencyCasePage /></RoleGate>}
           />
           <Route
             path="/departments/premature"

@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Baby, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { cn } from '@/shared/ui/cn';
 import { SignaturePad } from './SignaturePad';
+import { BedStayCasePage, type BedStayActions } from '@/features/beds/case/BedStayCasePage';
+import type { BedStayCaseView } from '@/features/beds/case/types';
 import {
-  getPrematureCase, upsertPrematureForm, recordTour,
+  getPrematureCase, listOrders, orderWorkup, setDischargeNote, finishTreatment,
+  extendStay, reissueDischargePayment, upsertPrematureForm, recordTour,
   type PrematureCase, type RespSupport, type TourType,
 } from './api';
 
@@ -18,51 +20,84 @@ const RESP = ['MV', 'CPAP', 'HFNC', 'NC', 'ROOM_AIR'] as const;
 export function PrematureCasePage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'overview' | 'form' | 'tours'>('form');
 
   const { data: c, isLoading } = useQuery({
     queryKey: ['prem-case', id], queryFn: () => getPrematureCase(id!), enabled: !!id,
   });
+  const ordersQuery = useQuery({
+    queryKey: ['prem-orders', id], queryFn: () => listOrders(id!), enabled: !!id,
+  });
 
   if (isLoading || !c) return <div className="p-6 text-sm text-ink-500">{t('common.loading')}</div>;
 
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ['prem-case', id] }),
+    qc.invalidateQueries({ queryKey: ['prem-orders', id] }),
+    qc.invalidateQueries({ queryKey: ['prem-beds'] }),
+    qc.invalidateQueries({ queryKey: ['prem-admissions'] }),
+    qc.invalidateQueries({ queryKey: ['payments'] }),
+    qc.invalidateQueries({ queryKey: ['visits'] }),
+  ]);
+
+  const a = c.admission;
+  const view: BedStayCaseView = {
+    patientId: a.patientId, patientName: a.patientName, patientMrn: a.patientMrn,
+    visitDisplayId: a.visitDisplayId, bedCode: a.bedCode, status: a.status,
+    stayValue: a.stayValue, stayUnit: a.stayUnit, admittedAt: a.admittedAt, stayExpiresAt: a.stayExpiresAt,
+    treatmentFinishedAt: a.treatmentFinishedAt, closedAt: a.closedAt, dischargeNote: a.dischargeNote,
+    initialPaymentId: a.initialPaymentId, finalPaymentId: a.finalPaymentId,
+  };
+
+  const actions: BedStayActions = {
+    onOrder: async (target, note) => { await orderWorkup(id!, target, note || undefined); await invalidate(); },
+    onSetDischargeNote: async (note) => { await setDischargeNote(id!, note); await invalidate(); },
+    onFinish: async (override, reason) => { await finishTreatment(id!, override, reason); await invalidate(); },
+    onExtend: async (value, unit) => { await extendStay(id!, value, unit); await invalidate(); },
+    onReissue: async () => { await reissueDischargePayment(id!); await invalidate(); },
+  };
+
   return (
-    <div className="space-y-4 p-1">
-      <button type="button" onClick={() => navigate('/departments/premature')}
-        className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900">
-        <ArrowLeft size={14} className="rtl:rotate-180" /> {t('premature.detail.title')}
-      </button>
+    <BedStayCasePage
+      backTo="/departments/premature"
+      backLabel={t('premature.detail.title')}
+      view={view}
+      orders={ordersQuery.data ?? []}
+      ordersLoading={ordersQuery.isLoading}
+      statusLabel={(code) => t(`premature.admissionStatus.${code}`)}
+      canExtend
+      actions={actions}
+      clinical={
+        <PrematureClinical
+          c={c} admissionId={id!}
+          onSaved={() => qc.invalidateQueries({ queryKey: ['prem-case', id] })}
+          t={t}
+        />
+      }
+    />
+  );
+}
 
-      <header className="flex items-center justify-between">
-        <button type="button" onClick={() => navigate(`/patients/${c.admission.patientId}`)}
-          className="group flex items-center gap-3 text-start" data-testid="case-patient">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-700"><Baby size={18} /></span>
-          <span>
-            <span className="block font-semibold text-ink-900">{c.admission.patientName}</span>
-            <span className="block font-mono text-[11px] text-ink-500">
-              {c.admission.patientMrn} · {c.admission.bedCode} · {t(`premature.admissionStatus.${c.admission.status}`)}
-            </span>
-          </span>
-          <ChevronRight size={16} className="text-ink-300 group-hover:text-brand-600 rtl:rotate-180" />
-        </button>
-      </header>
-
-      <div className="flex gap-1 border-b border-ink-100">
-        {(['form', 'tours', 'overview'] as const).map((tb) => (
-          <button key={tb} type="button" onClick={() => setTab(tb)}
-            className={cn('border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-              tab === tb ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-600 hover:text-ink-900')}
-            data-testid={`case-tab-${tb}`}>
-            {t(`premature.case.tab.${tb}`)}
+/** The premature-specific Clinical tab: the Form and the daily Tours, behind an inner toggle. */
+function PrematureClinical({ c, admissionId, onSaved, t }: {
+  c: PrematureCase; admissionId: string; onSaved: () => void; t: (k: string) => string;
+}) {
+  const [view, setView] = useState<'form' | 'tours'>('form');
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex rounded-lg border border-ink-200 p-0.5">
+        {(['form', 'tours'] as const).map((v) => (
+          <button key={v} type="button" onClick={() => setView(v)}
+            className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              view === v ? 'bg-brand-600 text-white' : 'text-ink-600 hover:bg-ink-50')}
+            data-testid={`clinical-${v}`}>
+            {t(`premature.case.tab.${v}`)}
           </button>
         ))}
       </div>
-
-      {tab === 'form' && <FormTab c={c} onSaved={() => qc.invalidateQueries({ queryKey: ['prem-case', id] })} t={t} admissionId={id!} />}
-      {tab === 'tours' && <ToursTab c={c} onSaved={() => qc.invalidateQueries({ queryKey: ['prem-case', id] })} t={t} admissionId={id!} />}
-      {tab === 'overview' && <OverviewTab c={c} t={t} />}
+      {view === 'form'
+        ? <FormTab c={c} admissionId={admissionId} onSaved={onSaved} t={t} />
+        : <ToursTab c={c} admissionId={admissionId} onSaved={onSaved} t={t} />}
     </div>
   );
 }
@@ -244,19 +279,6 @@ function ToursTab({ c, admissionId, onSaved, t }: { c: PrematureCase; admissionI
           </ul>
         )}
       </div>
-    </div>
-  );
-}
-
-function OverviewTab({ c, t }: { c: PrematureCase; t: (k: string) => string }) {
-  return (
-    <div className="rounded-xl border border-ink-100 bg-white p-4 text-sm">
-      <dl className="grid grid-cols-2 gap-3">
-        <div><dt className="text-ink-500">{t('premature.detail.status')}</dt><dd className="font-medium">{t(`premature.admissionStatus.${c.admission.status}`)}</dd></div>
-        <div><dt className="text-ink-500">{t('premature.bed')}</dt><dd className="font-medium">{c.admission.bedCode}</dd></div>
-        <div><dt className="text-ink-500">{t('premature.stayValue')}</dt><dd className="font-medium">{c.admission.stayValue} {t(`premature.${c.admission.stayUnit === 'DAYS' ? 'days' : 'hours'}`)}</dd></div>
-        <div><dt className="text-ink-500">{t('premature.detail.admittedAt')}</dt><dd className="font-medium">{new Date(c.admission.admittedAt).toLocaleString()}</dd></div>
-      </dl>
     </div>
   );
 }

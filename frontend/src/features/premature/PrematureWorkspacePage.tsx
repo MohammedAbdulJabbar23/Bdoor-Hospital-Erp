@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Baby, BedDouble, Clock, ChevronRight } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { BedStatusFilter, type BedFilter } from '@/features/beds/BedStatusFilter';
-import { BedDetailPanel } from './BedDetailPanel';
 import {
-  listBeds, listAdmissions, listIncomingPremature, admitPatient, extendStay,
-  reissueDischargePayment,
+  listBeds, listAdmissions, listIncomingPremature, admitPatient,
   type Bed, type PrematureVisit, type StayUnit,
 } from './api';
 
@@ -18,10 +17,10 @@ function isExpiringSoon(iso: string): boolean {
 }
 
 export function PrematureWorkspacePage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [admitFor, setAdmitFor] = useState<PrematureVisit | null>(null);
-  const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
   const [bedFilter, setBedFilter] = useState<BedFilter>('ALL');
 
   const { data: beds } = useQuery({ queryKey: ['prem-beds'], queryFn: listBeds, refetchInterval: 15000 });
@@ -40,22 +39,6 @@ export function PrematureWorkspacePage() {
     () => (incoming ?? []).filter((v) => !admittedVisitIds.has(v.id)),
     [incoming, admittedVisitIds],
   );
-
-  // Drawer: full admission + bed derived from already-loaded data (no extra fetch).
-  const selectedAdmission = useMemo(
-    () => (admissions ?? []).find((a) => a.id === selectedAdmissionId) ?? null,
-    [admissions, selectedAdmissionId],
-  );
-  const selectedBed = useMemo(
-    () => (beds ?? []).find((b) => b.occupant?.admissionId === selectedAdmissionId) ?? null,
-    [beds, selectedAdmissionId],
-  );
-  // Auto-close when the selected admission leaves the active set (e.g. discharged).
-  useEffect(() => {
-    if (selectedAdmissionId && admissions && !admissions.some((a) => a.id === selectedAdmissionId)) {
-      setSelectedAdmissionId(null);
-    }
-  }, [admissions, selectedAdmissionId]);
 
   // Client-side status filter over the already-fetched beds. Default ALL shows every bed.
   const bedCounts = useMemo(() => {
@@ -81,19 +64,6 @@ export function PrematureWorkspacePage() {
       qc.invalidateQueries({ queryKey: ['visits'] }),
     ]);
   };
-
-  const extendMut = useMutation({
-    mutationFn: ({ id, value, unit }: { id: string; value: number; unit: StayUnit }) =>
-      extendStay(id, value, unit),
-    onSuccess: async () => { toast.success(t('premature.toast.extended')); await invalidate(); },
-    onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
-  });
-
-  const reissueMut = useMutation({
-    mutationFn: (id: string) => reissueDischargePayment(id),
-    onSuccess: async () => { toast.success(t('premature.toast.reissued')); await invalidate(); },
-    onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
-  });
 
   return (
     <div className="space-y-6 p-1">
@@ -147,7 +117,7 @@ export function PrematureWorkspacePage() {
             <BedCard
               key={bed.id}
               bed={bed}
-              onOpen={() => bed.occupant && setSelectedAdmissionId(bed.occupant.admissionId)}
+              onOpen={() => bed.occupant && navigate(`/premature/admissions/${bed.occupant.admissionId}`)}
               t={t}
             />
           ))}
@@ -164,18 +134,6 @@ export function PrematureWorkspacePage() {
         />
       )}
 
-      {selectedBed && (
-        <BedDetailPanel
-          bed={selectedBed}
-          admission={selectedAdmission}
-          onClose={() => setSelectedAdmissionId(null)}
-          onExtend={extendMut.mutate}
-          onReissue={reissueMut.mutate}
-          pending={extendMut.isPending || reissueMut.isPending}
-          t={t}
-          dir={i18n.dir() === 'rtl' ? 'rtl' : 'ltr'}
-        />
-      )}
     </div>
   );
 }

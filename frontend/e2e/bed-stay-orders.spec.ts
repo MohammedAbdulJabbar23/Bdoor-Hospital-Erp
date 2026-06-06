@@ -4,35 +4,49 @@ import { authedContext } from './helpers/api';
 import { registerPatient, API_BASE } from './helpers/seeds';
 
 /**
- * Bed-stay orders + results-pending gate + discharge note, driven END-TO-END THROUGH THE UI for both
- * departments. Each test seeds straight to OCCUPIED (UNDER_CARE / UNDER_TREATMENT) via API, then:
- * open workspace → open bed drawer → order a LABORATORY workup (assert it shows in the live order
- * list) → set + save a discharge note (assert the saved toast) → Finish treatment (assert the
- * results-pending dialog appears listing the open order) → fill an override reason → Finish anyway →
- * assert success (case moves to awaiting discharge while the bed stays Occupied).
+ * Bed-stay orders + referral note + results-pending gate + discharge note, driven END-TO-END THROUGH
+ * THE UI for both departments. Each test seeds straight to OCCUPIED (UNDER_CARE / UNDER_TREATMENT) via
+ * API, then: open workspace → click the bed (navigates to the new tabbed CASE PAGE) → on the
+ * Laboratory tab, "Send to department" with a NOTE (assert it shows on the order row) → set + save a
+ * discharge note on Overview → Finish treatment (results-pending dialog warns about the open order) →
+ * override with a reason → Finish anyway → assert the case moves to Awaiting discharge payment.
  */
 
 async function relogin(page: Page, role: 'premature' | 'emergency' | 'cashier') {
-  // logout() clears localStorage, which throws on a fresh about:blank page (no origin yet),
-  // so on the first call — before any navigation — we just log in.
   if (page.url().startsWith('http')) await logout(page);
   await login(page, role);
 }
 
-async function openPrematureWorkspace(page: Page) {
-  await relogin(page, 'premature');
-  await page.goto('/departments/premature');
-  await expect(page.getByTestId('prem-beds')).toBeVisible({ timeout: 15_000 });
+async function orderLabWithNote(page: Page, note: string) {
+  await page.getByTestId('case-tab-LABORATORY').click();
+  await page.getByTestId('order-LABORATORY').click();
+  await expect(page.getByTestId('order-dialog')).toBeVisible();
+  await page.getByTestId('order-note').fill(note);
+  await page.getByTestId('order-send').click();
+  await expect(page.getByText(/Order sent/i)).toBeVisible({ timeout: 10_000 });
+  // The order appears on the Laboratory tab with its referral note.
+  await expect(page.getByTestId('order-row-LABORATORY')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('order-row-LABORATORY')).toContainText(note);
 }
 
-async function openEmergencyWorkspace(page: Page) {
-  await relogin(page, 'emergency');
-  await page.goto('/departments/emergency');
-  await expect(page.getByTestId('emerg-beds')).toBeVisible({ timeout: 15_000 });
+async function saveDischargeNote(page: Page, note: string) {
+  await page.getByTestId('case-tab-overview').click();
+  await page.getByTestId('discharge-note-input').fill(note);
+  await page.getByTestId('discharge-note-save').click();
+  await expect(page.getByText(/Discharge note saved/i)).toBeVisible({ timeout: 10_000 });
 }
 
-test('premature: order Lab → results-pending warn → override finish + discharge note', async ({ page }) => {
-  // Seed straight to UNDER_CARE via API.
+async function finishWithOverride(page: Page, reason: string) {
+  await page.getByTestId('detail-finish').click();
+  const dialog = page.getByTestId('results-pending-dialog');
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await expect(dialog).toContainText(/LAB/i);
+  await dialog.getByTestId('override-reason').fill(reason);
+  await dialog.getByTestId('finish-override').click();
+  await expect(page.getByText(/discharge payment sent to cashier/i)).toBeVisible({ timeout: 10_000 });
+}
+
+test('premature: order Lab with note → results-pending warn → override finish + discharge note', async ({ page }) => {
   const admin = await authedContext('admin');
   const premature = await authedContext('premature');
   const cashier = await authedContext('cashier');
@@ -57,43 +71,22 @@ test('premature: order Lab → results-pending warn → override finish + discha
   }).toPass({ timeout: 10_000 });
   await admin.dispose(); await premature.dispose(); await cashier.dispose();
 
-  // --- Open the workspace and the bed drawer. ---
-  await openPrematureWorkspace(page);
+  await relogin(page, 'premature');
+  await page.goto('/departments/premature');
   await expect(page.getByTestId(`bed-status-${bedCode}`)).toContainText(/Occupied/i, { timeout: 15_000 });
   await page.getByTestId(`bed-${bedCode}`).click();
-  const drawer = page.getByTestId('bed-detail-panel');
-  await expect(drawer).toBeVisible();
-  await expect(drawer).toContainText(/Under care/i);
 
-  // --- Order a LABORATORY workup; it appears in the live order list. ---
-  await drawer.getByTestId('order-LABORATORY').click();
-  await expect(page.getByText(/Order sent/i)).toBeVisible({ timeout: 10_000 });
-  const orderList = drawer.getByTestId('order-list');
-  await expect(orderList).toContainText(/LABORATORY/i, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/premature\/admissions\//, { timeout: 10_000 });
+  await expect(page.getByTestId('case-status')).toContainText(/Under care/i);
 
-  // --- Set + save a discharge note. ---
-  await drawer.getByTestId('discharge-note-input').fill('Stable; home on oral feeds; review in 1 week.');
-  await drawer.getByTestId('discharge-note-save').click();
-  await expect(page.getByText(/Discharge note saved/i)).toBeVisible({ timeout: 10_000 });
+  await orderLabWithNote(page, 'r/o sepsis — CBC + CRP, urgent');
+  await saveDischargeNote(page, 'Stable; home on oral feeds; review in 1 week.');
+  await finishWithOverride(page, 'Parents accept results will follow');
 
-  // --- Finish treatment → results-pending dialog warns about the open order. ---
-  await drawer.getByTestId('detail-finish').click();
-  const dialog = page.getByTestId('results-pending-dialog');
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await expect(dialog).toContainText(/LABORATORY/i);
-
-  // --- Override with a reason → Finish anyway succeeds. ---
-  await dialog.getByTestId('override-reason').fill('Parents accept results will follow');
-  await dialog.getByTestId('finish-override').click();
-  await expect(page.getByText(/discharge payment sent to cashier/i)).toBeVisible({ timeout: 10_000 });
-
-  // --- Bed stays Occupied while awaiting the discharge payment; the (still-open) drawer reflects it. ---
-  await expect(page.getByTestId(`bed-status-${bedCode}`)).toContainText(/Occupied/i, { timeout: 15_000 });
-  await expect(drawer).toContainText(/Awaiting discharge payment/i, { timeout: 10_000 });
+  await expect(page.getByTestId('case-status')).toContainText(/Awaiting discharge payment/i, { timeout: 10_000 });
 });
 
-test('emergency: order Lab → results-pending warn → override finish + discharge note', async ({ page }) => {
-  // Seed straight to UNDER_TREATMENT via API.
+test('emergency: order Lab with note → results-pending warn → override finish + discharge note', async ({ page }) => {
   const admin = await authedContext('admin');
   const emergency = await authedContext('emergency');
   const cashier = await authedContext('cashier');
@@ -119,37 +112,20 @@ test('emergency: order Lab → results-pending warn → override finish + discha
   }).toPass({ timeout: 10_000 });
   await admin.dispose(); await emergency.dispose(); await cashier.dispose();
 
-  // --- Open the workspace and the bed drawer. ---
-  await openEmergencyWorkspace(page);
+  await relogin(page, 'emergency');
+  await page.goto('/departments/emergency');
   await expect(page.getByTestId(`bed-status-${bedCode}`)).toContainText(/Occupied/i, { timeout: 15_000 });
   await page.getByTestId(`bed-${bedCode}`).click();
-  const drawer = page.getByTestId('bed-detail-panel');
-  await expect(drawer).toBeVisible();
-  await expect(drawer).toContainText(/Under treatment/i);
 
-  // --- Order a LABORATORY workup; it appears in the live order list. ---
-  await drawer.getByTestId('order-LABORATORY').click();
-  await expect(page.getByText(/Order sent/i)).toBeVisible({ timeout: 10_000 });
-  const orderList = drawer.getByTestId('order-list');
-  await expect(orderList).toContainText(/LABORATORY/i, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/emergency\/cases\//, { timeout: 10_000 });
+  await expect(page.getByTestId('case-status')).toContainText(/Under treatment/i);
 
-  // --- Set + save a discharge note. ---
-  await drawer.getByTestId('discharge-note-input').fill('Vitals stable; discharged with analgesia; GP follow-up.');
-  await drawer.getByTestId('discharge-note-save').click();
-  await expect(page.getByText(/Discharge note saved/i)).toBeVisible({ timeout: 10_000 });
+  // Emergency has NO extend-stay control.
+  await expect(page.getByTestId('detail-extend')).toHaveCount(0);
 
-  // --- Finish treatment → results-pending dialog warns about the open order. ---
-  await drawer.getByTestId('detail-finish').click();
-  const dialog = page.getByTestId('results-pending-dialog');
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await expect(dialog).toContainText(/LABORATORY/i);
+  await orderLabWithNote(page, 'chest film + CBC — trauma');
+  await saveDischargeNote(page, 'Vitals stable; discharged with analgesia; GP follow-up.');
+  await finishWithOverride(page, 'Patient accepts results will follow');
 
-  // --- Override with a reason → Finish anyway succeeds. ---
-  await dialog.getByTestId('override-reason').fill('Patient accepts results will follow');
-  await dialog.getByTestId('finish-override').click();
-  await expect(page.getByText(/discharge payment sent to cashier/i)).toBeVisible({ timeout: 10_000 });
-
-  // --- Bed stays Occupied while awaiting the discharge payment; the (still-open) drawer reflects it. ---
-  await expect(page.getByTestId(`bed-status-${bedCode}`)).toContainText(/Occupied/i, { timeout: 15_000 });
-  await expect(drawer).toContainText(/Awaiting discharge payment/i, { timeout: 10_000 });
+  await expect(page.getByTestId('case-status')).toContainText(/Awaiting discharge payment/i, { timeout: 10_000 });
 });
