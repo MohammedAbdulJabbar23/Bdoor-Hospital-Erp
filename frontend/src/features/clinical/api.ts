@@ -122,7 +122,7 @@ export async function getPatientHistory(patientId: string): Promise<PatientHisto
 
 /* ---------------- Department case results (lab / radiology / eco / emergency) ---------------- */
 
-export type DeptCategory = 'LAB' | 'IMAGING' | 'ECO' | 'EMERGENCY';
+export type DeptCategory = 'LAB' | 'RADIOLOGY' | 'ECO';
 export type DeptCaseStatus =
   | 'NEW' | 'AWAITING_PAYMENT' | 'AWAITING_STUDY'
   | 'FINDINGS_COMPLETE' | 'CLOSED' | 'RETURNED' | 'CANCELLED';

@@ -965,7 +965,7 @@ function PatientRecordPanel({
     [record],
   );
   const imagingCases = useMemo(
-    () => (record?.departmentCases ?? []).filter((c) => c.category === 'IMAGING' || c.category === 'ECO'),
+    () => (record?.departmentCases ?? []).filter((c) => c.category === 'RADIOLOGY' || c.category === 'ECO'),
     [record],
   );
   const dispenses = record?.pharmacyDispenses ?? [];
