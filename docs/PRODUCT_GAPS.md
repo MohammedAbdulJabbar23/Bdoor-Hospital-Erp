@@ -4,8 +4,15 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 10). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 11). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 11 results:**
+> - Ordering a **discontinued (archived)** catalogue item → **422 `SERVICE_ARCHIVED`** (rejected at
+>   forward-with-tests). Off-hours booking (03:00) → **422 `SLOT_NOT_AVAILABLE`**. Both solid.
+> - **Refines §11:** the booking handler DOES validate working hours (off-hours rejected) — the gap
+>   is specifically that it ignores **day-offs**, which the slot grid excludes but the booking guard
+>   does not. Narrower than first thought.
 >
 > **Iteration 10 results (clean — no new gaps):** full backend **integration-test suite re-run →
 > 116 app ITs, BUILD SUCCESS** (no cross-module regression after ~4h of loop activity + heavy
@@ -172,17 +179,19 @@
   - **Verified working (no gap):** bed-stay FINAL reject → re-issuable (P12b, covered by e2e); the
     idempotency + authz guards above.
 
-## 11. Appointment booking ignores doctor availability (day-off / hours) (M) ☐
-- **M — Confirmed (iteration 7).** `POST /api/appointments` (type `BOOKED`) validates only that the
-  slot is **not in the past** (`SCHEDULED_IN_PAST`) and **not already taken** (`SLOT_TAKEN`). It does
-  **not** check the doctor's weekly hours or days-off. Reproduced: added a day-off (the slot grid then
-  shows 0 available), but a direct booking at a former slot on that day returned **201**.
-  - **Impact:** appointments can be created when the doctor is off / outside working hours via the API
-    (the UI hides the slots, but the guard is bypassable; any client error or stale grid books anyway).
-  - **Fix:** in `BookAppointmentHandler`, validate `scheduledFor` against the doctor's computed
-    availability (working `WeeklyHour` for that weekday, not a `DayOff`, aligned to a slot boundary) —
-    reuse `SlotComputationService`. Reject with a clear code (e.g. `SLOT_UNAVAILABLE`). Add an IT.
-  - **Verified working (no gap):** VIP auto-bypass; past-slot + double-book guards.
+## 11. Appointment booking ignores the doctor's DAY-OFFS (M) ☐
+- **M — Confirmed (iteration 7), refined (iteration 11).** `POST /api/appointments` (type `BOOKED`)
+  validates: not in the past (`SCHEDULED_IN_PAST`), not already taken (`SLOT_TAKEN`), and **within the
+  doctor's weekly working hours** (off-hours like 03:00 → `SLOT_NOT_AVAILABLE`). **But it does NOT
+  exclude day-offs.** Reproduced: added a day-off (the slot grid then shows 0 available), yet a direct
+  booking at a former slot on that day — within normal working hours — returned **201**.
+  - **Impact:** appointments can be booked on a day the doctor has marked off (the UI hides those
+    slots, but the API guard is bypassable / a stale grid books anyway).
+  - **Fix:** in `BookAppointmentHandler`, also reject when `scheduledFor.toLocalDate()` is one of the
+    doctor's `DayOff`s (or validate against `SlotComputationService.compute(...)` which already
+    excludes day-offs, instead of weekly hours alone). Reject with a clear code; add an IT.
+  - **Verified working (no gap):** off-hours rejected (`SLOT_NOT_AVAILABLE`), past-slot + double-book
+    guards, archived-item ordering (`SERVICE_ARCHIVED`), VIP auto-bypass.
 
 ---
 
