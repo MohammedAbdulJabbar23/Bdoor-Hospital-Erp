@@ -4,8 +4,13 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 8). Stack at the time: backend reactor verify green (116 app
-> ITs), Playwright **75/75 re-run green** (stability), all localhost endpoints 200.
+> Last pass: **2026-06-07** (iteration 9). Stack at the time: backend reactor verify green (116 app
+> ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 9 results (clean — no new gaps):** pharmacy dispense state machine solid —
+> mark-given while PENDING → **422 `DISPENSE_NOT_READY`**, cancel PENDING → CANCELLED, double-cancel →
+> **422 `DISPENSE_ALREADY_TERMINAL`**, charge a cancelled dispense → 422 (clean reject). No 5xx, no
+> illegal transitions.
 >
 > **Iteration 8 results (clean — no new gaps):**
 > - Full Playwright suite re-run: **75/75** (no drift after hours of uptime + accumulated test data).
