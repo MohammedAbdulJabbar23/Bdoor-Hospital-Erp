@@ -4,8 +4,16 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 6). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-07** (iteration 7). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 7 results:**
+> - VIP auto-bypass **solid**: a VIP patient's consult → visit IN_PROGRESS with no cashier; payment
+>   APPROVED / `VIP_BYPASS` / `vipBypass=true` (and excluded from cash reconciliation).
+> - **Found a real gap → new §11:** booking does NOT validate the doctor's availability. With a
+>   day-off set (slot grid correctly shows 0 available), a direct `BOOKED` booking at a former slot
+>   on that day **succeeded (201)**. The handler only guards past-slot + double-book, so the slot
+>   grid is bypassable (day-off confirmed; likely also off-hours / non-working weekdays).
 >
 > **Iteration 6 results (clean — no new gaps):** state/booking guards all solid —
 > - Appointment booking: past slot → **422 `SCHEDULED_IN_PAST`**, double-book same slot →
@@ -149,6 +157,18 @@
     Doctor-Appointment BRD which is intended. Add an IT either way.
   - **Verified working (no gap):** bed-stay FINAL reject → re-issuable (P12b, covered by e2e); the
     idempotency + authz guards above.
+
+## 11. Appointment booking ignores doctor availability (day-off / hours) (M) ☐
+- **M — Confirmed (iteration 7).** `POST /api/appointments` (type `BOOKED`) validates only that the
+  slot is **not in the past** (`SCHEDULED_IN_PAST`) and **not already taken** (`SLOT_TAKEN`). It does
+  **not** check the doctor's weekly hours or days-off. Reproduced: added a day-off (the slot grid then
+  shows 0 available), but a direct booking at a former slot on that day returned **201**.
+  - **Impact:** appointments can be created when the doctor is off / outside working hours via the API
+    (the UI hides the slots, but the guard is bypassable; any client error or stale grid books anyway).
+  - **Fix:** in `BookAppointmentHandler`, validate `scheduledFor` against the doctor's computed
+    availability (working `WeeklyHour` for that weekday, not a `DayOff`, aligned to a slot boundary) —
+    reuse `SlotComputationService`. Reject with a clear code (e.g. `SLOT_UNAVAILABLE`). Add an IT.
+  - **Verified working (no gap):** VIP auto-bypass; past-slot + double-book guards.
 
 ---
 
