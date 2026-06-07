@@ -4,8 +4,14 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 3). Stack at the time: backend reactor verify green (116 app
-> ITs), Playwright 75/75 (added `bedstay-timeline.spec.ts`), all localhost endpoints 200.
+> Last pass: **2026-06-07** (iteration 4). Stack at the time: backend reactor verify green (116 app
+> ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 4 results (clean — no new gaps):**
+> - **§6 medication pipeline verified end-to-end.** Finalizing a doctor exam with a prescription
+>   auto-creates a pharmacy dispense via `ExamFinalizedToDispenseBridge` (AFTER_COMMIT) →
+>   `RX-2026-000168 PENDING`, line "Paracetamol 500mg", linked to the exam/visit and visible at
+>   `GET /dispenses/by-patient/{id}` (the doctor Medications tab's source). Pipeline is complete.
 >
 > **Iteration 3 results:**
 > - Added `e2e/bedstay-timeline.spec.ts` (admit → order Lab w/ note → drive lab to COMPLETED →
@@ -78,9 +84,11 @@
 - **M — Statistics/export upload** promised by several BRDs (Lab/Radiology/Premature) is not present.
 
 ## 6. Clinical / medications completeness (M)
-- **M — Medication history depends on the pharmacy dispense flow.** The doctor Medications tab reads
-  `pharmacyDispenses` + meds derived from finalized prescriptions; confirm the prescribe → pharmacy
-  dispense → dispensed lifecycle is complete and that dispenses always link back to the exam/visit.
+- ☑ **Medication pipeline verified (iteration 4).** Finalizing an exam with a prescription
+  auto-creates a dispense (`ExamFinalizedToDispenseBridge`), linked to the exam/visit, surfaced at
+  `GET /dispenses/by-patient/{id}` and the doctor Medications tab. The downstream charge → ready →
+  given lifecycle is covered by `PharmacyDispenseSummaryIT` / `PharmacyStock*IT`. (Open follow-up:
+  no e2e asserts the dispense appears on the doctor Medications tab — see §4.)
 - **L — Bed-stay/Doctor timeline lacks exact payment-approval timestamps** (derived client-side from
   aggregate + child visits; payment events would need a cashier feed). Documented as out of scope.
 
