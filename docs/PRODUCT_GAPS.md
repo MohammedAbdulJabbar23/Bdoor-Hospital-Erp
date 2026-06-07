@@ -4,8 +4,13 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 7). Stack at the time: backend reactor verify green (116 app
-> ITs), Playwright 75/75, all localhost endpoints 200.
+> Last pass: **2026-06-07** (iteration 8). Stack at the time: backend reactor verify green (116 app
+> ITs), Playwright **75/75 re-run green** (stability), all localhost endpoints 200.
+>
+> **Iteration 8 results (clean — no new gaps):**
+> - Full Playwright suite re-run: **75/75** (no drift after hours of uptime + accumulated test data).
+> - Input validation solid: duplicate national-id → **409 `DUPLICATE_PATIENT`**, negative/zero
+>   `stayValue` → **400 `VALIDATION_FAILED`**, blank `fullName` → 400. No raw 500s on bad input.
 >
 > **Iteration 7 results:**
 > - VIP auto-bypass **solid**: a VIP patient's consult → visit IN_PROGRESS with no cashier; payment
