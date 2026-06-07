@@ -4,8 +4,17 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 4). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-07** (iteration 5). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 5 results:**
+> - Idempotency **solid**: double-approving the same payment → 200 then **422 `PAYMENT_NOT_PENDING`**
+>   (no double-charge, no 5xx).
+> - Cross-role authz **solid**: lab→approve-payment 403; receptionist→`PUT /exams` 403.
+> - **Found a real workflow gap → new §10:** rejecting a *consult* (doctor-appointment) INITIAL
+>   payment leaves the visit **stuck in AWAITING_PAYMENT** with a REJECTED payment and no PENDING one
+>   to act on. `PaymentVisitBridge.onRejected` only handles FINAL-stage rejects; INITIAL is a no-op
+>   left to "the calling module", and doctor-appointment has no such bridge (bed-stay does).
 >
 > **Iteration 4 results (clean — no new gaps):**
 > - **§6 medication pipeline verified end-to-end.** Finalizing a doctor exam with a prescription
@@ -117,6 +126,23 @@
     (b) frontend — gate the "Results returned" entry on `o.resultsSummary` (the real signal) using
     `o.resultsAt ?? o.endedAt ?? o.startedAt` for the timestamp. Then re-enable the assertion in
     `bedstay-timeline.spec.ts`.
+
+## 10. Rejected consult payment leaves the visit stuck (M) ☐
+- **M — Confirmed (iteration 5).** When the cashier **rejects** a doctor-appointment (consult)
+  **INITIAL** payment: the payment → `REJECTED` but the visit stays `AWAITING_PAYMENT`, and **no new
+  PENDING payment is created** — so the cashier has nothing to approve and the doctor can't see the
+  patient. The visit is a dead-end (the rejected payment can't be re-approved → `PAYMENT_NOT_PENDING`).
+  - **Root cause:** `app/PaymentVisitBridge.onRejected` returns early for any non-FINAL stage; INITIAL
+    rejection is intentionally a no-op "for the calling module to decide". Bed-stay modules
+    (premature/emergency) own bridges that cancel the visit + release the bed on initial reject
+    (BRD P4b). **Doctor-appointment has no equivalent**, so its consult visits get stuck.
+  - **Inconsistency:** bed-stay initial-reject = CANCELLED; consult initial-reject = stuck
+    AWAITING_PAYMENT.
+  - **Fix (decide intent):** add a doctor-appointment payment bridge that, on INITIAL reject, either
+    (a) cancels the visit, or (b) re-issues a fresh PENDING payment for retry. Confirm against the
+    Doctor-Appointment BRD which is intended. Add an IT either way.
+  - **Verified working (no gap):** bed-stay FINAL reject → re-issuable (P12b, covered by e2e); the
+    idempotency + authz guards above.
 
 ---
 
