@@ -4,8 +4,14 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-07** (iteration 5). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-07** (iteration 6). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 6 results (clean — no new gaps):** state/booking guards all solid —
+> - Appointment booking: past slot → **422 `SCHEDULED_IN_PAST`**, double-book same slot →
+>   **409 `SLOT_TAKEN`**, unknown `type` enum → 400 (correctly rejected).
+> - Dept-case: re-open after payment → **422 `CASE_LOCKED`**, finalize before findings →
+>   **422 `CASE_NOT_COMPLETE`** (stays AWAITING_STUDY). No 5xx, no double-effects.
 >
 > **Iteration 5 results:**
 > - Idempotency **solid**: double-approving the same payment → 200 then **422 `PAYMENT_NOT_PENDING`**
