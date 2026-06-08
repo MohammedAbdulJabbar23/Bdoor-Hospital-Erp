@@ -4,8 +4,15 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-08** (iteration 12). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 13). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 13 results:**
+> - Attachment access correctly blocks non-clinical roles (receptionist/cashier → 403) and 404s a
+>   missing id. Good.
+> - **Found a privacy/least-privilege gap → new §13:** clinical case attachments are protected by a
+>   flat role check (`LAB_STAFF/RADIOLOGY_STAFF/ECO_STAFF/DOCTOR/ADMIN`), **not scoped to the owning
+>   department or case** — a radiology tech downloaded a **LAB** case's confidential attachment (200).
 >
 > **Iteration 12 results:**
 > - Exam reopen authz solid: non-admin (doctor) → **403**.
@@ -213,6 +220,19 @@
     of reopening, rather than refusing when the visit is COMPLETED. Keep refusing only for CANCELLED
     (or when downstream billing/discharge has progressed). Add an IT that reopens a finalized consult.
   - **Verified working (no gap):** reopen is correctly admin-only (doctor → 403).
+
+## 13. Clinical attachments are role-gated, not department/case-scoped (M, privacy) ☐
+- **M — Confirmed (iteration 13).** `GET /api/dept-cases/attachments/{id}/file` (and upload/list/delete)
+  use a flat `hasAnyRole('LAB_STAFF','RADIOLOGY_STAFF','ECO_STAFF','DOCTOR','ADMIN')`. There is **no
+  check that the caller's department matches the case's category** (or that the doctor was involved).
+  Repro: a `radiology` user downloaded a **LAB** case's confidential attachment → **200**.
+  - **Impact:** any clinical-department staff can read/download/delete any other department's case
+    attachments for any patient — a patient-privacy / least-privilege issue (relevant for a hospital
+    handling sensitive results). Non-clinical roles (receptionist/cashier) are correctly blocked (403).
+  - **Fix:** scope to the owning department — reuse `DepartmentRoleGuard.requireDepartmentMatches(
+    case.category())` (already used by open/findings/finalize) on the attachment endpoints, plus allow
+    the ordering DOCTOR + ADMIN. Add an authz IT (radiology → lab attachment = 403).
+  - **Verified working (no gap):** non-clinical roles blocked; missing id → 404.
 
 ---
 
