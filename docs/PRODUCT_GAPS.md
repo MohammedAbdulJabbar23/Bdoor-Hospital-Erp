@@ -4,8 +4,13 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-08** (iteration 15). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 16). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 16 results (clean — money handling verified):** cashier reconciliation correct.
+> `cashCollected` stayed **152,000** after a VIP consult (VIP-bypass excluded) and rose to **172,000**
+> (+20,000 fee) after a CASH consult. Endpoint cleanly separates byMethod / byStage / grandTotal /
+> vipBypass / cashCollected. No gap.
 >
 > **Iteration 15 results — §13 scope bounded (good news on blast radius):** the core destructive
 > case ops ARE department-scoped — radiology → open / upload-findings / finalize a LAB case all
