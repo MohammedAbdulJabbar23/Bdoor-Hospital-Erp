@@ -4,8 +4,15 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-08** (iteration 14). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 15). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 15 results — §13 scope bounded (good news on blast radius):** the core destructive
+> case ops ARE department-scoped — radiology → open / upload-findings / finalize a LAB case all
+> → **403** (`DepartmentRoleGuard` works). The un-scoped surface is narrower than feared: only the
+> **attachment endpoints** (§13, the H delete/upload) and **`GET /dept-cases/{id}`** read (radiology
+> read a LAB case → 200, a privacy read). Fix is the same `requireDepartmentMatches`, applied to
+> those two surfaces.
 >
 > **Iteration 14 results — §13 is worse than thought (bumped M → H):** the cross-department
 > over-permission extends to **destructive writes**. A `radiology` user both **uploaded to** and
@@ -240,7 +247,11 @@
   - **Fix:** scope to the owning department — reuse `DepartmentRoleGuard.requireDepartmentMatches(
     case.category())` (already used by open/findings/finalize) on the attachment endpoints, plus allow
     the ordering DOCTOR + ADMIN. Add an authz IT (radiology → lab attachment = 403).
-  - **Verified working (no gap):** non-clinical roles blocked; missing id → 404.
+  - **Scope bounded (iteration 15):** the destructive *case* ops (open / findings / finalize) ARE
+    department-scoped (radiology → LAB case = 403), so the unguarded surface is just (a) the
+    attachment endpoints and (b) `GET /dept-cases/{id}` (cross-dept read = 200). Same fix.
+  - **Verified working (no gap):** non-clinical roles blocked; missing id → 404; open/findings/finalize
+    correctly cross-dept-scoped.
 
 ---
 
