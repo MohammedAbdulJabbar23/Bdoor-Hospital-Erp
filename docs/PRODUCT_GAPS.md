@@ -4,8 +4,16 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-08** (iteration 11). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 12). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 12 results:**
+> - Exam reopen authz solid: non-admin (doctor) → **403**.
+> - **Found a real bug → new §12:** the admin "Reopen exam" feature is effectively **dead**.
+>   Finalizing an exam completes the visit (→ COMPLETED); reopen then 422s with `VISIT_TERMINAL`
+>   ("Cannot reopen an exam on a closed visit"). So reopen can never succeed for a finalized exam —
+>   the one state where it's meant to be used. The UI Reopen button + endpoint + domain method are
+>   unreachable.
 >
 > **Iteration 11 results:**
 > - Ordering a **discontinued (archived)** catalogue item → **422 `SERVICE_ARCHIVED`** (rejected at
@@ -192,6 +200,19 @@
     excludes day-offs, instead of weekly hours alone). Reject with a clear code; add an IT.
   - **Verified working (no gap):** off-hours rejected (`SLOT_NOT_AVAILABLE`), past-slot + double-book
     guards, archived-item ordering (`SERVICE_ARCHIVED`), VIP auto-bypass.
+
+## 12. Admin "Reopen exam" is unreachable (finalize closes the visit) (M) ☐
+- **M — Confirmed (iteration 12).** The admin-only `POST /api/exams/{id}/reopen` (and its UI "Reopen"
+  button) can never succeed for a finalized exam. Repro: finalize an exam → visit becomes
+  **COMPLETED**, exam FINALIZED → `reopen` as admin returns **422 `VISIT_TERMINAL`** ("Cannot reopen an
+  exam on a closed visit (COMPLETED)"). Since reopen is only meaningful on a FINALIZED exam, and
+  finalize always completes the visit, the feature is dead code.
+  - **Impact:** an admin cannot correct/amend a finalized exam at all — the documented amend path is
+    unusable.
+  - **Fix:** `ReopenExamHandler`/controller should resume the visit (COMPLETED → IN_PROGRESS) as part
+    of reopening, rather than refusing when the visit is COMPLETED. Keep refusing only for CANCELLED
+    (or when downstream billing/discharge has progressed). Add an IT that reopens a finalized consult.
+  - **Verified working (no gap):** reopen is correctly admin-only (doctor → 403).
 
 ---
 
