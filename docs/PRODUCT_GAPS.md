@@ -4,8 +4,13 @@
 > fragile, or inconsistent. Severity: **H** (high — correctness/security/data-loss or BRD-blocking),
 > **M** (medium — important but workaround exists), **L** (low — polish). Status: ☐ open / ☑ done.
 >
-> Last pass: **2026-06-08** (iteration 13). Stack at the time: backend reactor verify green (116 app
+> Last pass: **2026-06-08** (iteration 14). Stack at the time: backend reactor verify green (116 app
 > ITs), Playwright 75/75, all localhost endpoints 200.
+>
+> **Iteration 14 results — §13 is worse than thought (bumped M → H):** the cross-department
+> over-permission extends to **destructive writes**. A `radiology` user both **uploaded to** and
+> **DELETED** a LAB case's attachment (both 200). So any clinical-dept staff can tamper with /
+> destroy another department's clinical evidence — a data-integrity issue, not just privacy.
 >
 > **Iteration 13 results:**
 > - Attachment access correctly blocks non-clinical roles (receptionist/cashier → 403) and 404s a
@@ -221,7 +226,10 @@
     (or when downstream billing/discharge has progressed). Add an IT that reopens a finalized consult.
   - **Verified working (no gap):** reopen is correctly admin-only (doctor → 403).
 
-## 13. Clinical attachments are role-gated, not department/case-scoped (M, privacy) ☐
+## 13. Clinical attachments are role-gated, not department/case-scoped (H — privacy + tamper) ☐
+- **H — Write/delete confirmed cross-department (iteration 14).** Beyond reading, a `radiology` user
+  **uploaded to** and **DELETED** a LAB case's attachment (both 200). So any clinical-dept staff can
+  destroy/replace another department's clinical evidence — data-integrity + privacy. Bumped from M.
 - **M — Confirmed (iteration 13).** `GET /api/dept-cases/attachments/{id}/file` (and upload/list/delete)
   use a flat `hasAnyRole('LAB_STAFF','RADIOLOGY_STAFF','ECO_STAFF','DOCTOR','ADMIN')`. There is **no
   check that the caller's department matches the case's category** (or that the doctor was involved).
