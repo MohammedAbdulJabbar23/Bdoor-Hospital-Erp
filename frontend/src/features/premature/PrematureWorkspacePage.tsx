@@ -3,18 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Baby, BedDouble, Clock, ChevronRight } from 'lucide-react';
+import { Baby } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { BedStatusFilter, type BedFilter } from '@/features/beds/BedStatusFilter';
+import { BedCard } from '@/features/beds/BedCard';
 import {
   listBeds, listAdmissions, listIncomingPremature, admitPatient,
   type Bed, type PrematureVisit, type StayUnit,
 } from './api';
-
-function isExpiringSoon(iso: string): boolean {
-  const expires = new Date(iso).getTime();
-  return expires - Date.now() < 2 * 60 * 60 * 1000; // within 2h
-}
 
 export function PrematureWorkspacePage() {
   const { t } = useTranslation();
@@ -117,6 +113,7 @@ export function PrematureWorkspacePage() {
             <BedCard
               key={bed.id}
               bed={bed}
+              ns="premature"
               onOpen={() => bed.occupant && navigate(`/premature/admissions/${bed.occupant.admissionId}`)}
               t={t}
             />
@@ -138,75 +135,6 @@ export function PrematureWorkspacePage() {
   );
 }
 
-function BedCard({
-  bed, onOpen, t,
-}: {
-  bed: Bed;
-  onOpen: () => void;
-  t: (k: string) => string;
-}) {
-  const occ = bed.occupant;
-  const expiring = occ && isExpiringSoon(occ.stayExpiresAt);
-  const statusClass =
-    bed.status === 'AVAILABLE'
-      ? 'bg-emerald-50 text-emerald-700'
-      : bed.status === 'OCCUPIED'
-      ? 'bg-brand-50 text-brand-700'
-      : 'bg-amber-50 text-amber-700';
-
-  const header = (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-1.5 font-mono text-sm font-semibold text-ink-900">
-        <BedDouble size={14} /> {bed.code}
-      </span>
-      <span
-        className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + statusClass}
-        data-testid={`bed-status-${bed.code}`}
-      >
-        {t(`premature.bedStatus.${bed.status}`)}
-      </span>
-    </div>
-  );
-
-  // Empty bed — quiet, non-interactive tile.
-  if (!occ) {
-    return (
-      <div
-        className="rounded-lg border border-dashed border-ink-200 p-3 opacity-80"
-        data-testid={`bed-${bed.code}`}
-      >
-        {header}
-        <p className="mt-2 text-[11px] text-ink-400">{t('premature.detail.empty')}</p>
-      </div>
-    );
-  }
-
-  // Occupied / pending — clickable, opens the detail drawer.
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group w-full rounded-lg border border-ink-100 p-3 text-start transition hover:border-brand-200 hover:bg-brand-50/40 focus:outline-none focus:ring-2 focus:ring-brand-200"
-      data-testid={`bed-${bed.code}`}
-      aria-label={`${bed.code} — ${occ.patientName}`}
-    >
-      {header}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-xs font-medium text-ink-900">{occ.patientName}</div>
-          <div className="truncate font-mono text-[11px] text-ink-500">{occ.patientMrn}</div>
-        </div>
-        <ChevronRight size={16} className="shrink-0 text-ink-300 group-hover:text-brand-600 rtl:rotate-180" />
-      </div>
-      {expiring && (
-        <div className="mt-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
-          <Clock size={11} /> {t('premature.expiringSoon')}
-        </div>
-      )}
-    </button>
-  );
-}
-
 function AdmitDialog({
   visit, beds, onClose, onAdmitted, t,
 }: {
@@ -219,9 +147,13 @@ function AdmitDialog({
   const [bedId, setBedId] = useState(beds[0]?.id ?? '');
   const [stayValue, setStayValue] = useState(3);
   const [stayUnit, setStayUnit] = useState<StayUnit>('DAYS');
+  // The beds query can resolve after this dialog mounts (parallel fetch with the incoming
+  // queue). Fall back to the first available bed so the effective selection always matches
+  // what the <select> displays as its default.
+  const effectiveBedId = bedId || (beds[0]?.id ?? '');
 
   const mut = useMutation({
-    mutationFn: () => admitPatient({ visitId: visit.id, bedId, stayValue, stayUnit }),
+    mutationFn: () => admitPatient({ visitId: visit.id, bedId: effectiveBedId, stayValue, stayUnit }),
     onSuccess: async () => { toast.success(t('premature.toast.admitted')); onAdmitted(); },
     onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),
   });
@@ -232,7 +164,7 @@ function AdmitDialog({
         <h3 className="text-sm font-semibold text-ink-900">{t('premature.assignBed')} — {visit.patientName}</h3>
         <label className="mt-4 block text-xs font-medium text-ink-700">{t('premature.bed')}</label>
         <select
-          value={bedId} onChange={(e) => setBedId(e.target.value)}
+          value={effectiveBedId} onChange={(e) => setBedId(e.target.value)}
           className="mt-1 w-full rounded-md border border-ink-200 px-2 py-1.5 text-sm"
           data-testid="admit-bed-select"
         >
@@ -265,7 +197,7 @@ function AdmitDialog({
             {t('common.cancel')}
           </button>
           <button
-            type="button" disabled={!bedId || mut.isPending} onClick={() => mut.mutate()}
+            type="button" disabled={!effectiveBedId || mut.isPending} onClick={() => mut.mutate()}
             className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             data-testid="admit-confirm"
           >
