@@ -10,10 +10,11 @@ public record StayDocumentDto(
         UUID id, String source, String fileName, String contentType, long sizeBytes, String sha256,
         String label, UUID uploadedBy, Instant uploadedAt, boolean archived, String fileUrl
 ) {
-    /** Rows without a recorded checksum (e.g. result attachments merged in at read time). */
-    public StayDocumentDto(UUID id, String source, String fileName, String contentType, long sizeBytes,
-                           String label, UUID uploadedBy, Instant uploadedAt, boolean archived, String fileUrl) {
-        this(id, source, fileName, contentType, sizeBytes, null, label, uploadedBy, uploadedAt, archived, fileUrl);
+    /** A result attachment surfaced from a forwarded Lab/Radiology/ECO visit (no recorded sha). */
+    public static StayDocumentDto fromResultAttachment(UUID id, String source, String fileName,
+            String contentType, long sizeBytes, UUID uploadedBy, Instant uploadedAt, String fileUrl) {
+        return new StayDocumentDto(id, source, fileName, contentType, sizeBytes, null, null,
+                uploadedBy, uploadedAt, false, fileUrl);
     }
 
     public static StayDocumentDto fromUpload(StayDocument d, String fileUrl) {

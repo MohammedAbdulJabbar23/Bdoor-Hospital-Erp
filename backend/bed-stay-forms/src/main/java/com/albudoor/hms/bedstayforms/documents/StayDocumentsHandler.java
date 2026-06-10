@@ -24,6 +24,10 @@ public class StayDocumentsHandler {
 
     static final long MAX_BYTES = 20L * 1024 * 1024;
 
+    static final java.util.Set<String> ALLOWED_TYPES = java.util.Set.of(
+            "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/tiff",
+            "application/pdf");
+
     private final StayDocumentRepository documents;
     private final StayDirectoryRegistry stays;
     private final FileStorage storage;
@@ -55,15 +59,16 @@ public class StayDocumentsHandler {
             throw new DomainException("DOCUMENT_TOO_LARGE", "Documents are limited to 20 MB");
         }
         String ct = file.getContentType();
-        if (ct == null || !(ct.startsWith("image/") || ct.equals("application/pdf"))) {
+        if (ct == null || !ALLOWED_TYPES.contains(ct)) {
             throw new DomainException("DOCUMENT_TYPE_NOT_ALLOWED", "Only images and PDF documents are allowed");
         }
+        String fileName = safeName(file.getOriginalFilename());
         StoredBlob blob;
         try (var in = file.getInputStream()) {
-            blob = storage.saveVerified(in, file.getOriginalFilename() == null ? "document" : file.getOriginalFilename());
+            blob = storage.saveVerified(in, fileName);
         }
         StayDocument d = StayDocument.upload(dept, stayId, info.patientId(),
-                file.getOriginalFilename(), ct, blob.sizeBytes(), blob.sha256(), blob.storageKey(),
+                fileName, ct, blob.sizeBytes(), blob.sha256(), blob.storageKey(),
                 (label == null || label.isBlank()) ? null : label.trim(), uploadedBy);
         String base = "/api/bed-stays/" + dept + "/" + stayId + "/documents/";
         return StayDocumentDto.fromUpload(documents.save(d), base + d.getId() + "/file");
@@ -86,5 +91,14 @@ public class StayDocumentsHandler {
             throw new NotFoundException("Document not found on this stay: " + documentId);
         }
         return d;
+    }
+
+    /** Mirrors CaseAttachmentController.safeName: strips path components, blanks fall back, truncates. */
+    private static String safeName(String n) {
+        if (n == null || n.isBlank()) return "document";
+        // Strip any path components
+        String base = n.replaceAll(".*[/\\\\]", "").trim();
+        if (base.isBlank()) return "document";
+        return base.length() > 300 ? base.substring(0, 300) : base;
     }
 }

@@ -125,7 +125,8 @@ class StayDocumentsIT extends IntegrationTest {
 
         var up = rest.exchange(docsUrl(stay), HttpMethod.POST, pngUpload("nurse", "scan.png", "Statistics form"), Map.class);
         assertThat(up.getStatusCode().is2xxSuccessful()).as("%s", up.getBody()).isTrue();
-        assertThat(up.getBody().get("sha256")).asString().hasSize(64);
+        assertThat(up.getBody().get("sha256"))
+                .isEqualTo("c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77");
         assertThat(((Number) up.getBody().get("sizeBytes")).longValue()).isEqualTo(PNG.length);
         String docId = (String) up.getBody().get("id");
 
@@ -147,6 +148,23 @@ class StayDocumentsIT extends IntegrationTest {
         assertThat(arch.getStatusCode().is2xxSuccessful()).isTrue();
         var after = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
         assertThat(((Map<String, Object>) after.getBody().get(0)).get("archived")).isEqualTo(true);
+
+        // Arabic filename survives upload, listing and streaming (RFC 5987 disposition)
+        var arabic = rest.exchange(docsUrl(stay), HttpMethod.POST, pngUpload("nurse", "تقرير.png", null), Map.class);
+        assertThat(arabic.getStatusCode().is2xxSuccessful()).as("%s", arabic.getBody()).isTrue();
+        String arabicId = (String) arabic.getBody().get("id");
+        var withArabic = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        assertThat((List<Map<String, Object>>) withArabic.getBody())
+                .extracting(m -> m.get("fileName")).contains("تقرير.png");
+        var arabicFile = rest.exchange(docsUrl(stay) + "/" + arabicId + "/file", HttpMethod.GET,
+                new HttpEntity<>(auth("doctor")), byte[].class);
+        assertThat(arabicFile.getStatusCode().is2xxSuccessful()).isTrue();
+
+        // a different admission's URL cannot stream this stay's document
+        String otherStay = admitUnderCare();
+        var foreign = rest.exchange(docsUrl(otherStay) + "/" + docId + "/file", HttpMethod.GET,
+                new HttpEntity<>(auth("premature")), String.class);
+        assertThat(foreign.getStatusCode().value()).isEqualTo(404);
     }
 
     @Test
@@ -163,6 +181,7 @@ class StayDocumentsIT extends IntegrationTest {
         }, part));
         var bad = rest.exchange(docsUrl(stay), HttpMethod.POST, new HttpEntity<>(form, h), String.class);
         assertThat(bad.getStatusCode().value()).isEqualTo(422);
+        assertThat(bad.getBody()).contains("DOCUMENT_TYPE_NOT_ALLOWED");
 
         // nurse cannot archive
         var up = rest.exchange(docsUrl(stay), HttpMethod.POST, pngUpload("nurse", "x.png", null), Map.class);
@@ -187,6 +206,7 @@ class StayDocumentsIT extends IntegrationTest {
         }, part));
         var big = rest.exchange(docsUrl(stay), HttpMethod.POST, new HttpEntity<>(form, h), String.class);
         assertThat(big.getStatusCode().value()).isEqualTo(422);
+        assertThat(big.getBody()).contains("DOCUMENT_TOO_LARGE");
 
         // cross-department: a user whose ONLY role is EMERGENCY_STAFF gets 403 on a premature stay
         String pureEmergency = pureStaff("EMERGENCY_STAFF");
@@ -197,5 +217,6 @@ class StayDocumentsIT extends IntegrationTest {
         String cancelled = admitPendingThenRejectAndAwaitCancelled();
         var closedUp = rest.exchange(docsUrl(cancelled), HttpMethod.POST, pngUpload("nurse", "late.png", null), String.class);
         assertThat(closedUp.getStatusCode().value()).isEqualTo(422);
+        assertThat(closedUp.getBody()).contains("STAY_CLOSED");
     }
 }

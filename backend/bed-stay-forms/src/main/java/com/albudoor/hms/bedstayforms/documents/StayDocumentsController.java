@@ -59,7 +59,9 @@ public class StayDocumentsController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(d.getContentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"" + d.getFileName().replace("\"", "_") + "\"")
+                        org.springframework.http.ContentDisposition.inline()
+                                .filename(d.getFileName(), java.nio.charset.StandardCharsets.UTF_8)
+                                .build().toString())
                 .contentLength(d.getSizeBytes())
                 .body(new InputStreamResource(storage.open(d.getStorageKey())));
     }
