@@ -173,4 +173,42 @@ class BedStayFormsIT extends IntegrationTest {
         assertThat(spec.get("present")).isEqualTo(true);
         assertThat(spec.get("signerName")).isEqualTo("Dr. Specialist");
     }
+
+    String tcUrl(String stayId) { return "/api/bed-stays/PREMATURE/" + stayId + "/treatment-charts"; }
+
+    @Test @SuppressWarnings("unchecked")
+    void treatment_chart_upsert_replaces_rows_per_date() {
+        String stay = admitUnderCare();
+
+        put(tcUrl(stay) + "/2026-06-10", Map.of("rows", List.of(
+                Map.of("medicineName", "Ampicillin", "dose", "50mg/kg", "frequency", "q12h",
+                        "timing", List.of("08", "", "", "", "", "20")),
+                Map.of("medicineName", "Gentamicin", "dose", "4mg/kg", "frequency", "q24h",
+                        "timing", List.of("10")))), "doctor", Map.class);
+
+        // replace with a single row
+        put(tcUrl(stay) + "/2026-06-10", Map.of("rows", List.of(
+                Map.of("medicineName", "Caffeine citrate", "dose", "5mg/kg", "frequency", "q24h"))),
+                "doctor", Map.class);
+
+        var r = rest.exchange(tcUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        assertThat(r.getStatusCode().is2xxSuccessful()).isTrue();
+        List<Map<String, Object>> charts = r.getBody();
+        assertThat(charts).hasSize(1);
+        assertThat(charts.get(0).get("chartDate")).isEqualTo("2026-06-10");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) charts.get(0).get("rows");
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get("medicineName")).isEqualTo("Caffeine citrate");
+        List<Object> timing = (List<Object>) rows.get(0).get("timing");
+        assertThat(timing).hasSize(6);
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void treatment_chart_distinct_dates_are_distinct_charts() {
+        String stay = admitUnderCare();
+        put(tcUrl(stay) + "/2026-06-10", Map.of("rows", List.of(Map.of("medicineName", "A"))), "doctor", Map.class);
+        put(tcUrl(stay) + "/2026-06-11", Map.of("rows", List.of(Map.of("medicineName", "B"))), "doctor", Map.class);
+        var charts = rest.exchange(tcUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class).getBody();
+        assertThat(charts).hasSize(2);
+    }
 }
