@@ -16,7 +16,11 @@ public class StayDirectoryRegistry {
     private final Map<StayDepartment, StayDirectory> byDepartment = new EnumMap<>(StayDepartment.class);
 
     public StayDirectoryRegistry(List<StayDirectory> directories) {
-        for (StayDirectory d : directories) byDepartment.put(d.department(), d);
+        for (StayDirectory d : directories) {
+            if (byDepartment.putIfAbsent(d.department(), d) != null) {
+                throw new IllegalStateException("Duplicate StayDirectory for " + d.department());
+            }
+        }
     }
 
     /** 404 if the department has no directory bean or the stay doesn't exist. */
