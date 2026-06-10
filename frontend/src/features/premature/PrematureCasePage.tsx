@@ -12,6 +12,7 @@ import type { BedStayCaseView } from '@/features/beds/case/types';
 import {
   getPrematureCase, listOrders, orderWorkup, setDischargeNote, finishTreatment,
   extendStay, reissueDischargePayment, upsertPrematureForm, recordTour,
+  uploadSignature, fetchSignatureUrl,
   type PrematureCase, type RespSupport, type TourType,
 } from './api';
 
@@ -179,9 +180,15 @@ function FormTab({ c, admissionId, onSaved, t }: { c: PrematureCase; admissionId
 
       {f && (
         <Section title={t('premature.form.signatures')}>
-          <SignaturePad admissionId={admissionId} slot="CLINICAL_PHARMACY" label={t('premature.form.pharmacySign')} meta={f.clinicalPharmacySignature} onSaved={onSaved} t={t} />
-          <SignaturePad admissionId={admissionId} slot="RESIDENT" label={t('premature.form.residentSign')} meta={f.residentSignature} onSaved={onSaved} t={t} />
-          <SignaturePad admissionId={admissionId} slot="SENIOR_RESIDENT" label={t('premature.form.seniorSign')} meta={f.seniorResidentSignature} onSaved={onSaved} t={t} />
+          <SignaturePad slot="CLINICAL_PHARMACY" label={t('premature.form.pharmacySign')} meta={f.clinicalPharmacySignature}
+            upload={(blob, name) => uploadSignature(admissionId, 'CLINICAL_PHARMACY', blob, name)}
+            fetchUrl={() => fetchSignatureUrl(admissionId, 'CLINICAL_PHARMACY')} onSaved={onSaved} t={t} />
+          <SignaturePad slot="RESIDENT" label={t('premature.form.residentSign')} meta={f.residentSignature}
+            upload={(blob, name) => uploadSignature(admissionId, 'RESIDENT', blob, name)}
+            fetchUrl={() => fetchSignatureUrl(admissionId, 'RESIDENT')} onSaved={onSaved} t={t} />
+          <SignaturePad slot="SENIOR_RESIDENT" label={t('premature.form.seniorSign')} meta={f.seniorResidentSignature}
+            upload={(blob, name) => uploadSignature(admissionId, 'SENIOR_RESIDENT', blob, name)}
+            fetchUrl={() => fetchSignatureUrl(admissionId, 'SENIOR_RESIDENT')} onSaved={onSaved} t={t} />
         </Section>
       )}
     </form>

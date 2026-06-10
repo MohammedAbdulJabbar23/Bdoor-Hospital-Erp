@@ -2,13 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/shared/api/client';
-import { uploadSignature, fetchSignatureUrl, type SignatureSlot, type SigMeta } from '@/features/premature/api';
+
+export type SignatureMeta = { present: boolean; signerName?: string | null };
 
 export function SignaturePad({
-  admissionId, slot, label, meta, onSaved, t,
+  slot, label, meta, upload, fetchUrl, onSaved, t,
 }: {
-  admissionId: string; slot: SignatureSlot; label: string; meta: SigMeta;
-  onSaved: () => void; t: (k: string) => string;
+  slot: string;
+  label: string;
+  meta: SignatureMeta;
+  upload: (blob: Blob, signerName: string) => Promise<unknown>;
+  fetchUrl: () => Promise<string | null>;
+  onSaved: () => void;
+  t: (k: string) => string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -19,9 +25,10 @@ export function SignaturePad({
   useEffect(() => {
     if (!meta.present) return;
     let url: string | null = null;
-    fetchSignatureUrl(admissionId, slot).then((u) => { url = u; setSavedUrl(u); }).catch(() => {});
+    fetchUrl().then((u) => { url = u; setSavedUrl(u); }).catch(() => {});
     return () => { if (url) URL.revokeObjectURL(url); };
-  }, [admissionId, slot, meta.present]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot, meta.present]);
 
   const pos = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -51,14 +58,14 @@ export function SignaturePad({
     mutationFn: () => new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (blob) => {
         if (!blob) return reject(new Error('empty'));
-        try { await uploadSignature(admissionId, slot, blob, signerName.trim()); resolve(); }
+        try { await upload(blob, signerName.trim()); resolve(); }
         catch (e) { reject(e); }
       }, 'image/png');
     }),
     onSuccess: async () => {
       toast.success(t('premature.form.signatureSaved'));
       setSavedUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return prev; });
-      const url = await fetchSignatureUrl(admissionId, slot).catch(() => null);
+      const url = await fetchUrl().catch(() => null);
       setSavedUrl(url); setEditing(false); onSaved();
     },
     onError: (e) => toast.error(extractApiError(e)?.message ?? t('premature.toast.error')),

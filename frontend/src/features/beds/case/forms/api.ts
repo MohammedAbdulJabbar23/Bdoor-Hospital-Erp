@@ -78,6 +78,18 @@ export async function uploadMhSignature(
   return res.data;
 }
 
+/** Fetch a stored signature as a blob object-URL (the <img> can't carry the Bearer token). */
+export async function fetchMhSignatureUrl(
+  dept: StayDepartment, stayId: string, slot: MhSlot,
+): Promise<string | null> {
+  try {
+    const res = await api.get(`${base(dept, stayId)}/medical-history/signatures/${slot}`, { responseType: 'blob' });
+    return URL.createObjectURL(res.data as Blob);
+  } catch {
+    return null;
+  }
+}
+
 export async function listNursingProcedures(dept: StayDepartment, stayId: string): Promise<NursingProcedure[]> {
   const res = await api.get(`${base(dept, stayId)}/nursing-procedures`);
   return res.data;
@@ -113,4 +125,15 @@ export async function uploadChartSignature(
   const res = await api.post(`${base(dept, stayId)}/treatment-charts/${date}/signature`, fd,
     { headers: { 'Content-Type': 'multipart/form-data' } });
   return res.data;
+}
+
+export async function fetchChartSignatureUrl(
+  dept: StayDepartment, stayId: string, date: string,
+): Promise<string | null> {
+  try {
+    const res = await api.get(`${base(dept, stayId)}/treatment-charts/${date}/signature`, { responseType: 'blob' });
+    return URL.createObjectURL(res.data as Blob);
+  } catch {
+    return null;
+  }
 }
