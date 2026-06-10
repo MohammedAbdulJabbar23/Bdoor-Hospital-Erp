@@ -4,6 +4,7 @@ import com.albudoor.hms.platform.exception.ConflictException;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.InvalidCredentialsException;
 import com.albudoor.hms.platform.exception.NotFoundException;
+import com.albudoor.hms.platform.exception.StorageMissingException;
 import com.albudoor.hms.platform.exception.TooManyAttemptsException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -35,6 +36,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNotFound(NotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiError.of(404, ex.getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(StorageMissingException.class)
+    public ResponseEntity<ApiError> handleStorageMissing(StorageMissingException ex) {
+        log.error("Document blob missing: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(404, "DOCUMENT_MISSING", ex.getMessage()));
     }
 
     @ExceptionHandler(ConflictException.class)

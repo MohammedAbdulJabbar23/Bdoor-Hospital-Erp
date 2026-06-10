@@ -1,5 +1,6 @@
 package com.albudoor.hms.platform.storage;
 
+import com.albudoor.hms.platform.exception.StorageMissingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,11 @@ public class LocalFileSystemStorage implements FileStorage {
         this.root = Path.of(dir).toAbsolutePath().normalize();
         Files.createDirectories(this.root);
         log.info("FileStorage rooted at {}", this.root);
+        if ("data/attachments".equals(dir)) {
+            log.warn("hms.attachments.dir is the RELATIVE default ('data/attachments') — the "
+                    + "storage root depends on the launch directory. Set an absolute path in "
+                    + "configuration to avoid scattered document roots (see docs/OPERATIONS.md).");
+        }
     }
 
     @Override
@@ -52,6 +58,7 @@ public class LocalFileSystemStorage implements FileStorage {
         if (!p.startsWith(root)) {
             throw new IOException("Refusing to open path outside storage root: " + storageKey);
         }
+        if (!Files.exists(p)) throw new StorageMissingException(storageKey);
         return Files.newInputStream(p);
     }
 
@@ -62,6 +69,25 @@ public class LocalFileSystemStorage implements FileStorage {
             throw new IOException("Refusing to delete path outside storage root: " + storageKey);
         }
         return Files.deleteIfExists(p);
+    }
+
+    @Override
+    public StoredBlob saveVerified(InputStream in, String suggestedName) throws IOException {
+        String ext = extOf(suggestedName);
+        String key = LocalDate.now() + "/" + UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
+        Path target = root.resolve(key);
+        Files.createDirectories(target.getParent());
+        java.security.MessageDigest md;
+        try {
+            md = java.security.MessageDigest.getInstance("SHA-256");
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e); // JDK guarantees SHA-256
+        }
+        long size;
+        try (var digestIn = new java.security.DigestInputStream(in, md)) {
+            size = Files.copy(digestIn, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return new StoredBlob(key, java.util.HexFormat.of().formatHex(md.digest()), size);
     }
 
     private static String extOf(String name) {

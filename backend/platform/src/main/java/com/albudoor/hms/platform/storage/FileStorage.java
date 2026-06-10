@@ -19,4 +19,11 @@ public interface FileStorage {
 
     /** Best-effort delete; returns false if the underlying object was already gone. */
     boolean delete(String storageKey) throws IOException;
+
+    /**
+     * Persist bytes computing SHA-256 + size in the same pass. Default implementation for
+     * any non-local backend wraps {@link #save}; LocalFileSystemStorage overrides for a
+     * single-pass streaming hash.
+     */
+    StoredBlob saveVerified(InputStream in, String suggestedName) throws IOException;
 }
