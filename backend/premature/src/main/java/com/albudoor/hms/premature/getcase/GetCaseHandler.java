@@ -5,10 +5,12 @@ import com.albudoor.hms.patientregistry.domain.Patient;
 import com.albudoor.hms.patientregistry.infrastructure.PatientRepository;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.premature.api.AdmissionResponse;
+import com.albudoor.hms.premature.api.PatientCaseFormResponse;
 import com.albudoor.hms.premature.api.PrematureCaseResponse;
 import com.albudoor.hms.premature.api.PrematureFormResponse;
 import com.albudoor.hms.premature.api.PrematureTourResponse;
 import com.albudoor.hms.premature.domain.PrematureAdmission;
+import com.albudoor.hms.premature.infrastructure.PatientCaseFormRepository;
 import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
 import com.albudoor.hms.premature.infrastructure.PrematureFormRepository;
 import com.albudoor.hms.premature.infrastructure.PrematureTourRepository;
@@ -27,13 +29,16 @@ public class GetCaseHandler {
     private final PrematureFormRepository forms;
     private final PrematureTourRepository tours;
     private final PatientRepository patients;
+    private final PatientCaseFormRepository caseForms;
 
     public GetCaseHandler(PrematureAdmissionRepository admissions, PrematureFormRepository forms,
-                          PrematureTourRepository tours, PatientRepository patients) {
+                          PrematureTourRepository tours, PatientRepository patients,
+                          PatientCaseFormRepository caseForms) {
         this.admissions = admissions;
         this.forms = forms;
         this.tours = tours;
         this.patients = patients;
+        this.caseForms = caseForms;
     }
 
     @Transactional(readOnly = true)
@@ -44,11 +49,18 @@ public class GetCaseHandler {
                 .map(PrematureFormResponse::from).orElse(null);
         var tourList = tours.findAllByAdmissionIdOrderByRecordedAtDesc(admissionId)
                 .stream().map(PrematureTourResponse::from).toList();
-        return new PrematureCaseResponse(AdmissionResponse.from(adm), form, prefill(adm), tourList);
+        PatientCaseFormResponse caseForm = caseForms.findByAdmissionId(admissionId)
+                .map(PatientCaseFormResponse::from).orElse(null);
+        Patient patient = patients.findById(adm.getPatientId()).orElse(null);
+        InfantDetails details = patient == null ? null : patient.getInfantDetails();
+        var caseFilePrefill = new PrematureCaseResponse.CaseFilePrefill(
+                details == null ? null : details.getMotherName(),
+                patient == null || patient.getGender() == null ? null : patient.getGender().name());
+        return new PrematureCaseResponse(AdmissionResponse.from(adm), form, prefill(adm, patient), tourList,
+                caseForm, caseFilePrefill);
     }
 
-    private PrematureCaseResponse.Prefill prefill(PrematureAdmission adm) {
-        Patient p = patients.findById(adm.getPatientId()).orElse(null);
+    private PrematureCaseResponse.Prefill prefill(PrematureAdmission adm, Patient p) {
         InfantDetails d = (p == null) ? null : p.getInfantDetails();
         String age = (p == null) ? null : deriveAge(p.getDateOfBirth(),
                 adm.getAdmittedAt().atZone(ZoneOffset.UTC).toLocalDate());
