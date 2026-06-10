@@ -176,7 +176,18 @@ export type Prefill = {
   lengthCm: number | null; ofcCm: number | null;
 };
 
-export type PrematureCase = { admission: Admission; form: PrematureForm | null; prefill: Prefill; tours: Tour[] };
+export type PatientCaseForm = {
+  wardNumber: string | null;
+  nextOfKinAddress: string | null;
+  nextOfKinPhone: string | null;
+  treatingSpecialist: string | null;
+  initialDiagnosis: string | null;
+  finalDiagnosis: string | null;
+};
+
+export type CaseFilePrefill = { motherName: string | null; gender: string | null };
+
+export type PrematureCase = { admission: Admission; form: PrematureForm | null; prefill: Prefill; tours: Tour[]; caseForm: PatientCaseForm | null; caseFilePrefill: CaseFilePrefill; };
 
 export async function getPrematureCase(admissionId: string): Promise<PrematureCase> {
   const res = await api.get(`/premature/admissions/${admissionId}/case`);
@@ -188,6 +199,10 @@ export async function upsertPrematureForm(admissionId: string, body: Record<stri
 }
 export async function recordTour(admissionId: string, body: Record<string, unknown>): Promise<Tour> {
   const res = await api.post(`/premature/admissions/${admissionId}/tours`, body);
+  return res.data;
+}
+export async function upsertCaseForm(admissionId: string, body: Partial<PatientCaseForm>): Promise<PatientCaseForm> {
+  const res = await api.put(`/premature/admissions/${admissionId}/case-form`, body);
   return res.data;
 }
 export async function uploadSignature(admissionId: string, slot: SignatureSlot, file: Blob, signerName: string): Promise<void> {
