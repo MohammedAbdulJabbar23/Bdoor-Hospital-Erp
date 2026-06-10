@@ -103,6 +103,9 @@ class BedStayFormsIT extends IntegrationTest {
         var r = rest.exchange(npUrl(stay), HttpMethod.POST,
                 new HttpEntity<>(Map.of("performedAt", "2026-06-10T08:00:00Z"), auth("nurse")), String.class);
         assertThat(r.getStatusCode().value()).isEqualTo(400);   // bean validation
+        var blank = rest.exchange(npUrl(stay), HttpMethod.POST,
+                new HttpEntity<>(Map.of("procedureName", "   ", "performedAt", "2026-06-10T08:00:00Z"), auth("nurse")), String.class);
+        assertThat(blank.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test @SuppressWarnings("unchecked")

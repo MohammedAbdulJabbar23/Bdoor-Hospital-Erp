@@ -25,7 +25,7 @@ public class NursingProceduresHandler {
     @Transactional(readOnly = true)
     public List<NursingProcedureDto> list(StayDepartment dept, UUID stayId) {
         stays.require(dept, stayId);
-        return rows.findAllByDepartmentAndStayIdOrderByPerformedAtDesc(dept, stayId)
+        return rows.findAllByDepartmentAndStayIdOrderByPerformedAtDescCreatedAtDesc(dept, stayId)
                 .stream().map(NursingProcedureDto::from).toList();
     }
 

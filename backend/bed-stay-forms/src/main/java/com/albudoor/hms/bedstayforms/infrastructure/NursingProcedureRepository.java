@@ -8,5 +8,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface NursingProcedureRepository extends JpaRepository<NursingProcedureEntry, UUID> {
-    List<NursingProcedureEntry> findAllByDepartmentAndStayIdOrderByPerformedAtDesc(StayDepartment department, UUID stayId);
+    List<NursingProcedureEntry> findAllByDepartmentAndStayIdOrderByPerformedAtDescCreatedAtDesc(StayDepartment department, UUID stayId);
 }
