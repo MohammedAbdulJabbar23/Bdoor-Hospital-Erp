@@ -10,8 +10,8 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>premature</artifactId>
-    <name>HMS — Premature</name>
+    <artifactId>bed-stay-forms</artifactId>
+    <name>HMS — Bed Stay Forms</name>
 
     <dependencies>
         <dependency>
@@ -20,27 +20,7 @@
         </dependency>
         <dependency>
             <groupId>com.albudoor.hms</groupId>
-            <artifactId>visit-management</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.albudoor.hms</groupId>
-            <artifactId>cashier</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.albudoor.hms</groupId>
-            <artifactId>catalogue</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.albudoor.hms</groupId>
-            <artifactId>patient-registry</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.albudoor.hms</groupId>
             <artifactId>identity</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.albudoor.hms</groupId>
-            <artifactId>bed-stay-forms</artifactId>
         </dependency>
 
         <dependency>

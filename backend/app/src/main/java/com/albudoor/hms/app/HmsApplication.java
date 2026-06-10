@@ -1,5 +1,6 @@
 package com.albudoor.hms.app;
 
+import com.albudoor.hms.bedstayforms.BedStayFormsAutoConfig;
 import com.albudoor.hms.cashier.CashierAutoConfig;
 import com.albudoor.hms.catalogue.CatalogueAutoConfig;
 import com.albudoor.hms.clinicalcase.ClinicalCaseAutoConfig;
@@ -29,6 +30,7 @@ import org.springframework.context.annotation.Import;
         DepartmentServicesAutoConfig.class,
         ClinicalCaseAutoConfig.class,
         PharmacyAutoConfig.class,
+        BedStayFormsAutoConfig.class,
         PrematureAutoConfig.class,
         EmergencyAutoConfig.class
 })
