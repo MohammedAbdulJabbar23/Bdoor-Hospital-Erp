@@ -125,4 +125,13 @@ class ArchitectureTest {
                 .whereLayer("infrastructure").mayOnlyAccessLayers("domain");
         rule.check(CLASSES);
     }
+
+    @Test
+    void bedStayFormsDoesNotDependOnDepartmentModules() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..bedstayforms..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..premature..", "..emergency..");
+        rule.check(CLASSES);
+    }
 }
