@@ -76,6 +76,35 @@ class BedStayFormsIT extends IntegrationTest {
 
     String mhUrl(String stayId) { return "/api/bed-stays/PREMATURE/" + stayId + "/medical-history"; }
 
+    String npUrl(String stayId) { return "/api/bed-stays/PREMATURE/" + stayId + "/nursing-procedures"; }
+
+    @Test @SuppressWarnings("unchecked")
+    void nursing_rows_append_attribute_and_list_newest_first() {
+        String stay = admitUnderCare();
+
+        post(npUrl(stay), Map.of("procedureName", "Umbilical care",
+                "performedAt", "2026-06-10T08:00:00Z", "note", "tolerated well"), "nurse", Map.class);
+        post(npUrl(stay), Map.of("procedureName", "NG tube feeding",
+                "performedAt", "2026-06-10T12:00:00Z"), "nurse", Map.class);
+
+        var r = rest.exchange(npUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        assertThat(r.getStatusCode().is2xxSuccessful()).isTrue();
+        List<Map<String, Object>> rows = r.getBody();
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).get("procedureName")).isEqualTo("NG tube feeding");   // newest first
+        assertThat(rows.get(1).get("procedureName")).isEqualTo("Umbilical care");
+        assertThat(rows.get(0).get("nurseName")).asString().isNotBlank();            // auto-attributed
+        assertThat(rows.get(0).get("recordedAt")).isNotNull();
+    }
+
+    @Test
+    void nursing_row_requires_procedure_name() {
+        String stay = admitUnderCare();
+        var r = rest.exchange(npUrl(stay), HttpMethod.POST,
+                new HttpEntity<>(Map.of("performedAt", "2026-06-10T08:00:00Z"), auth("nurse")), String.class);
+        assertThat(r.getStatusCode().value()).isEqualTo(400);   // bean validation
+    }
+
     @Test @SuppressWarnings("unchecked")
     void medical_history_upsert_get_roundtrip_with_prefill() {
         String stay = admitUnderCare();
