@@ -1,0 +1,201 @@
+package com.albudoor.hms.app.bedstayforms;
+
+import com.albudoor.hms.app.IntegrationTest;
+import com.albudoor.hms.cashier.domain.PaymentStatus;
+import com.albudoor.hms.cashier.infrastructure.PaymentRepository;
+import com.albudoor.hms.premature.domain.AdmissionStatus;
+import com.albudoor.hms.premature.domain.Bed;
+import com.albudoor.hms.premature.infrastructure.BedRepository;
+import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static java.time.Duration.ofSeconds;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+class StayDocumentsIT extends IntegrationTest {
+
+    /** 1x1 transparent PNG. */
+    static final byte[] PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+
+    @Autowired TestRestTemplate rest;
+    @Autowired BedRepository beds;
+    @Autowired PaymentRepository payments;
+    @Autowired PrematureAdmissionRepository admissions;
+
+    HttpHeaders auth(String user) {
+        var login = rest.postForEntity("/api/auth/login", Map.of("username", user, "password", user), Map.class);
+        HttpHeaders h = new HttpHeaders();
+        h.setContentType(MediaType.APPLICATION_JSON);
+        h.setBearerAuth((String) login.getBody().get("token"));
+        return h;
+    }
+
+    <T> T post(String path, Object body, String user, Class<T> type) {
+        var r = rest.exchange(path, HttpMethod.POST, new HttpEntity<>(body == null ? Map.of() : body, auth(user)), type);
+        assertThat(r.getStatusCode().is2xxSuccessful()).as("POST %s -> %s : %s", path, r.getStatusCode(), r.getBody()).isTrue();
+        return r.getBody();
+    }
+
+    /** Premature admission driven to UNDER_CARE — copied from PrematureCaseIT.admitUnderCare(). */
+    @SuppressWarnings("unchecked")
+    String admitUnderCare() {
+        var patient = post("/api/patients", Map.of("fullName", "Baby BSF " + System.nanoTime(), "gender", "MALE",
+                "dateOfBirth", "2026-05-01", "mobileNumber", "0773" + (System.nanoTime() % 10_000_000L), "vip", false),
+                "receptionist", Map.class);
+        var visit = post("/api/visits", Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist", Map.class);
+        String visitId = (String) visit.get("id");
+        Bed bed = beds.save(Bed.create("BSF-" + System.nanoTime(), "IT"));
+        var adm = post("/api/premature/admissions",
+                Map.of("visitId", visitId, "bedId", bed.getId().toString(), "stayValue", 3, "stayUnit", "DAYS"),
+                "premature", Map.class);
+        var initial = payments.findAllByVisitIdOrderByCreatedAtDesc(UUID.fromString(visitId)).stream()
+                .filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst().orElseThrow();
+        post("/api/payments/" + initial.getId() + "/approve", Map.of("paymentMethod", "CASH"), "cashier", Map.class);
+        return (String) adm.get("id");
+    }
+
+    /**
+     * The seeded "emergency"/"premature" users are department doctors (DEPT_STAFF + DOCTOR),
+     * and DOCTOR is hospital-wide by design — so cross-department scoping must be asserted
+     * with a user holding ONLY the dept-staff role.
+     */
+    String pureStaff(String role) {
+        String username = "it" + String.format("%09d", System.nanoTime() % 1_000_000_000L);
+        post("/api/users", Map.of("username", username, "password", username,
+                "fullName", "IT " + role, "roles", java.util.List.of(role)), "admin", Map.class);
+        return username;
+    }
+
+    /**
+     * CANCELLED via initial-payment rejection is the shortest path to a closed stay
+     * — copied from BedStayFormsAuthzIT.closed_stay_rejects_writes_but_allows_reads().
+     */
+    @SuppressWarnings("unchecked")
+    String admitPendingThenRejectAndAwaitCancelled() {
+        var patient = post("/api/patients", Map.of("fullName", "Baby AZ " + System.nanoTime(), "gender", "FEMALE",
+                "dateOfBirth", "2026-05-15", "mobileNumber", "0774" + (System.nanoTime() % 10_000_000L), "vip", false),
+                "receptionist", Map.class);
+        var visit = post("/api/visits", Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist", Map.class);
+        Bed bed = beds.save(Bed.create("AZ-" + System.nanoTime(), "IT"));
+        var adm = post("/api/premature/admissions",
+                Map.of("visitId", visit.get("id"), "bedId", bed.getId().toString(), "stayValue", 1, "stayUnit", "DAYS"),
+                "premature", Map.class);
+        String stay = (String) adm.get("id");
+        String visitId = (String) adm.get("visitId");
+        var initial = payments.findAllByVisitIdOrderByCreatedAtDesc(UUID.fromString(visitId)).stream()
+                .filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst().orElseThrow();
+        post("/api/payments/" + initial.getId() + "/reject", Map.of("reason", "IT"), "cashier", Map.class);
+        // cancellation is event-driven (cf. AdmitFlowIT) — wait for the admission to flip
+        await().atMost(ofSeconds(5)).untilAsserted(() ->
+                assertThat(admissions.findById(UUID.fromString(stay)).get().getStatus())
+                        .isEqualTo(AdmissionStatus.CANCELLED));
+        return stay;
+    }
+
+    String docsUrl(String stayId) { return "/api/bed-stays/PREMATURE/" + stayId + "/documents"; }
+
+    HttpEntity<LinkedMultiValueMap<String, Object>> pngUpload(String user, String fileName, String label) {
+        HttpHeaders h = auth(user);
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var filePart = new HttpHeaders();
+        filePart.setContentType(MediaType.IMAGE_PNG);
+        var form = new LinkedMultiValueMap<String, Object>();
+        form.add("file", new HttpEntity<>(new ByteArrayResource(PNG) {
+            @Override public String getFilename() { return fileName; }
+        }, filePart));
+        if (label != null) form.add("label", label);
+        return new HttpEntity<>(form, h);
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void upload_list_stream_archive_roundtrip() {
+        String stay = admitUnderCare();
+
+        var up = rest.exchange(docsUrl(stay), HttpMethod.POST, pngUpload("nurse", "scan.png", "Statistics form"), Map.class);
+        assertThat(up.getStatusCode().is2xxSuccessful()).as("%s", up.getBody()).isTrue();
+        assertThat(up.getBody().get("sha256")).asString().hasSize(64);
+        assertThat(((Number) up.getBody().get("sizeBytes")).longValue()).isEqualTo(PNG.length);
+        String docId = (String) up.getBody().get("id");
+
+        var list = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        List<Map<String, Object>> docs = list.getBody();
+        assertThat(docs).hasSize(1);
+        assertThat(docs.get(0).get("source")).isEqualTo("UPLOAD");
+        assertThat(docs.get(0).get("fileName")).isEqualTo("scan.png");
+        assertThat(docs.get(0).get("label")).isEqualTo("Statistics form");
+        assertThat(docs.get(0).get("archived")).isEqualTo(false);
+
+        var file = rest.exchange(docsUrl(stay) + "/" + docId + "/file", HttpMethod.GET,
+                new HttpEntity<>(auth("doctor")), byte[].class);
+        assertThat(file.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(file.getBody()).isEqualTo(PNG);
+
+        var arch = rest.exchange(docsUrl(stay) + "/" + docId + "/archive", HttpMethod.POST,
+                new HttpEntity<>(auth("premature")), Map.class);
+        assertThat(arch.getStatusCode().is2xxSuccessful()).isTrue();
+        var after = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        assertThat(((Map<String, Object>) after.getBody().get(0)).get("archived")).isEqualTo(true);
+    }
+
+    @Test
+    void upload_policy_rejects_bad_type_and_nurse_cannot_archive() {
+        String stay = admitUnderCare();
+        // bad content type
+        HttpHeaders h = auth("nurse");
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var part = new HttpHeaders();
+        part.setContentType(MediaType.TEXT_PLAIN);
+        var form = new LinkedMultiValueMap<String, Object>();
+        form.add("file", new HttpEntity<>(new ByteArrayResource("hi".getBytes()) {
+            @Override public String getFilename() { return "notes.txt"; }
+        }, part));
+        var bad = rest.exchange(docsUrl(stay), HttpMethod.POST, new HttpEntity<>(form, h), String.class);
+        assertThat(bad.getStatusCode().value()).isEqualTo(422);
+
+        // nurse cannot archive
+        var up = rest.exchange(docsUrl(stay), HttpMethod.POST, pngUpload("nurse", "x.png", null), Map.class);
+        String docId = (String) up.getBody().get("id");
+        var arch = rest.exchange(docsUrl(stay) + "/" + docId + "/archive", HttpMethod.POST,
+                new HttpEntity<>(auth("nurse")), String.class);
+        assertThat(arch.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void oversize_closed_stay_and_cross_department_are_rejected() {
+        String stay = admitUnderCare();
+
+        // oversize: 21 MB body -> 422 DOCUMENT_TOO_LARGE (multipart limit is 25MB so it reaches the handler)
+        HttpHeaders h = auth("nurse");
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var part = new HttpHeaders();
+        part.setContentType(MediaType.IMAGE_PNG);
+        var form = new LinkedMultiValueMap<String, Object>();
+        form.add("file", new HttpEntity<>(new ByteArrayResource(new byte[21 * 1024 * 1024]) {
+            @Override public String getFilename() { return "huge.png"; }
+        }, part));
+        var big = rest.exchange(docsUrl(stay), HttpMethod.POST, new HttpEntity<>(form, h), String.class);
+        assertThat(big.getStatusCode().value()).isEqualTo(422);
+
+        // cross-department: a user whose ONLY role is EMERGENCY_STAFF gets 403 on a premature stay
+        String pureEmergency = pureStaff("EMERGENCY_STAFF");
+        var denied = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth(pureEmergency)), String.class);
+        assertThat(denied.getStatusCode().value()).isEqualTo(403);
+
+        // closed stay: reject the initial payment of a FRESH pending admission -> CANCELLED -> upload 422
+        String cancelled = admitPendingThenRejectAndAwaitCancelled();
+        var closedUp = rest.exchange(docsUrl(cancelled), HttpMethod.POST, pngUpload("nurse", "late.png", null), String.class);
+        assertThat(closedUp.getStatusCode().value()).isEqualTo(422);
+    }
+}
