@@ -92,7 +92,7 @@ unique constraints: medical-history per stay, chart per stay+date.
 | `/medical-history` | GET / PUT | GET: dept staff, DOCTOR, NURSE, ADMIN. PUT: dept staff, DOCTOR, ADMIN |
 | `/medical-history/signatures/{slot}` | GET / POST | as above (PUT roles for POST) |
 | `/nursing-procedures` | GET / POST | GET: dept staff, DOCTOR, NURSE, ADMIN. POST: dept staff, NURSE, ADMIN |
-| `/treatment-charts` (+ `?date=`) | GET / PUT | GET: dept staff, DOCTOR, NURSE, ADMIN. PUT: dept staff, DOCTOR, ADMIN |
+| `/treatment-charts` (GET lists all; PUT at `/{date}`) | GET / PUT | GET: dept staff, DOCTOR, NURSE, ADMIN. PUT: dept staff, DOCTOR, ADMIN |
 | `/treatment-charts/{date}/signature` | GET / POST | as chart PUT |
 
 "Dept staff" = `PREMATURE_STAFF` for premature stays, `EMERGENCY_STAFF` for emergency
