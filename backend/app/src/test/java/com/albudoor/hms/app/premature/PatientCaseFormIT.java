@@ -5,6 +5,7 @@ import com.albudoor.hms.cashier.domain.PaymentStatus;
 import com.albudoor.hms.cashier.infrastructure.PaymentRepository;
 import com.albudoor.hms.premature.domain.Bed;
 import com.albudoor.hms.premature.infrastructure.BedRepository;
+import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -13,13 +14,16 @@ import org.springframework.http.*;
 import java.util.Map;
 import java.util.UUID;
 
+import static java.time.Duration.ofSeconds;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 class PatientCaseFormIT extends IntegrationTest {
 
     @Autowired TestRestTemplate rest;
     @Autowired BedRepository beds;
     @Autowired PaymentRepository payments;
+    @Autowired PrematureAdmissionRepository admissions;
 
     // auth(...), post(...) helpers copied from PrematureCaseIT
     private HttpHeaders auth(String user) {
@@ -75,5 +79,32 @@ class PatientCaseFormIT extends IntegrationTest {
         var cfPrefill = (Map<String, Object>) caseBody.get("caseFilePrefill");
         assertThat(cfPrefill.get("gender")).isEqualTo("FEMALE");
         assertThat(cfPrefill.containsKey("motherName")).isTrue();   // null for this seed, key must exist
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void case_form_write_rejected_once_admission_cancelled() {
+        // admit WITHOUT approving the initial payment, then reject it -> admission CANCELLED
+        var patient = post("/api/patients", Map.of("fullName", "Baby P6C " + System.nanoTime(), "gender", "MALE",
+                "dateOfBirth", "2026-05-22", "mobileNumber", "0776" + (System.nanoTime() % 10_000_000L), "vip", false),
+                "receptionist", Map.class);
+        var visit = post("/api/visits", Map.of("patientId", patient.get("id"), "visitType", "PREMATURE"), "receptionist", Map.class);
+        String visitId = (String) visit.get("id");
+        Bed bed = beds.save(Bed.create("P6C-" + System.nanoTime(), "IT"));
+        var adm = post("/api/premature/admissions",
+                Map.of("visitId", visitId, "bedId", bed.getId().toString(), "stayValue", 1, "stayUnit", "DAYS"),
+                "premature", Map.class);
+        String admId = (String) adm.get("id");
+        var initial = payments.findAllByVisitIdOrderByCreatedAtDesc(UUID.fromString(visitId)).stream()
+                .filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst().orElseThrow();
+        post("/api/payments/" + initial.getId() + "/reject", Map.of("reason", "IT"), "cashier", Map.class);
+
+        await().atMost(ofSeconds(5)).untilAsserted(() ->
+                assertThat(admissions.findById(UUID.fromString(admId)).orElseThrow().getStatus())
+                        .isEqualTo(com.albudoor.hms.premature.domain.AdmissionStatus.CANCELLED));
+
+        var r = rest.exchange("/api/premature/admissions/" + admId + "/case-form", HttpMethod.PUT,
+                new HttpEntity<>(Map.of("wardNumber", "W-9"), auth("doctor")), String.class);
+        assertThat(r.getStatusCode().value()).isEqualTo(422);
     }
 }
