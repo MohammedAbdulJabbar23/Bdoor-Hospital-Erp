@@ -345,7 +345,6 @@ export default {
     forms: {
       save: 'حفظ',
       saved: 'تم الحفظ',
-      signed: 'تم حفظ التوقيع',
       ptName: 'اسم المريض',
       ptCode: 'رمز المريض',
       age: 'العمر',
@@ -385,7 +384,6 @@ export default {
         doctorSign: 'توقيع الطبيب',
       },
       caseFile: {
-        title: 'ملف المريض الراقد',
         wardNumber: 'رقم الردهة',
         motherName: 'اسم الأم',
         gender: 'الجنس',

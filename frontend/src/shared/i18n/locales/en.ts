@@ -345,7 +345,6 @@ export default {
     forms: {
       save: 'Save',
       saved: 'Saved',
-      signed: 'Signature saved',
       ptName: 'Pt. Name',
       ptCode: 'Pt. Code',
       age: 'Age',
@@ -385,7 +384,6 @@ export default {
         doctorSign: 'Doctor sign',
       },
       caseFile: {
-        title: 'Patient case file',
         wardNumber: 'Ward number',
         motherName: "Mother's name",
         gender: 'Sex',
