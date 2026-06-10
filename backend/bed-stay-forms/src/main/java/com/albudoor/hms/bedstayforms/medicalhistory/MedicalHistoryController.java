@@ -6,18 +6,14 @@ import com.albudoor.hms.bedstayforms.api.MedicalHistoryDto;
 import com.albudoor.hms.bedstayforms.api.MedicalHistoryResponse;
 import com.albudoor.hms.bedstayforms.api.SignatureView;
 import com.albudoor.hms.bedstayforms.directory.StayDirectoryRegistry;
-import com.albudoor.hms.bedstayforms.domain.FormSignature;
 import com.albudoor.hms.bedstayforms.domain.MedicalHistorySheet;
 import com.albudoor.hms.bedstayforms.domain.MhSignatureSlot;
 import com.albudoor.hms.bedstayforms.domain.StayDepartment;
 import com.albudoor.hms.bedstayforms.infrastructure.MedicalHistoryRepository;
-import com.albudoor.hms.platform.exception.DomainException;
+import com.albudoor.hms.bedstayforms.signatures.SignatureStore;
 import com.albudoor.hms.platform.exception.NotFoundException;
-import com.albudoor.hms.platform.storage.FileStorage;
 import jakarta.validation.Valid;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,16 +31,16 @@ public class MedicalHistoryController {
     private final BedStayAccess access;
     private final MedicalHistoryRepository sheets;
     private final StayDirectoryRegistry stays;
-    private final FileStorage storage;
+    private final SignatureStore signatures;
 
     public MedicalHistoryController(MedicalHistoryHandler handler, BedStayAccess access,
                                     MedicalHistoryRepository sheets, StayDirectoryRegistry stays,
-                                    FileStorage storage) {
+                                    SignatureStore signatures) {
         this.handler = handler;
         this.access = access;
         this.sheets = sheets;
         this.stays = stays;
-        this.storage = storage;
+        this.signatures = signatures;
     }
 
     @GetMapping
@@ -72,17 +68,9 @@ public class MedicalHistoryController {
             throws IOException {
         access.checkDoctorWrite(department);
         stays.requireOpen(department, stayId);
-        if (file.isEmpty()) throw new DomainException("SIGNATURE_EMPTY", "Signature image is empty");
-        String ct = file.getContentType();
-        if (ct == null || !ct.startsWith("image/")) {
-            throw new DomainException("SIGNATURE_NOT_IMAGE", "Signature must be an image");
-        }
         MedicalHistorySheet sheet = sheets.findByDepartmentAndStayId(department, stayId)
                 .orElseGet(() -> MedicalHistorySheet.create(department, stayId));
-        String key;
-        try (var in = file.getInputStream()) {
-            key = storage.save(in, "signature.png", file.getSize());
-        }
+        String key = signatures.store(file);
         sheet.applySignature(slot, key, signerName, CurrentUser.id());
         return SignatureView.from(sheets.save(sheet).signature(slot));
     }
@@ -94,9 +82,6 @@ public class MedicalHistoryController {
         access.checkRead(department);
         MedicalHistorySheet sheet = sheets.findByDepartmentAndStayId(department, stayId)
                 .orElseThrow(() -> new NotFoundException("No medical history for stay " + stayId));
-        FormSignature s = sheet.signature(slot);
-        if (!s.present()) throw new NotFoundException("No signature in slot " + slot);
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG)
-                .body(new InputStreamResource(storage.open(s.getImageKey())));
+        return signatures.stream(sheet.signature(slot), slot.name());
     }
 }

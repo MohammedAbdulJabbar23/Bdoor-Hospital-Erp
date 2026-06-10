@@ -89,7 +89,7 @@ class BedStayFormsIT extends IntegrationTest {
         assertThat(before.get("form")).isNull();
 
         // Doctor saves the sheet
-        put(mhUrl(stay), Map.ofEntries(
+        Map<String, Object> sent = Map.ofEntries(
                 Map.entry("weightKg", 3.2), Map.entry("heightCm", 49),
                 Map.entry("doctorName", "Dr. House"),
                 Map.entry("chiefComplaint", "Fever for 2 days"),
@@ -98,12 +98,17 @@ class BedStayFormsIT extends IntegrationTest {
                 Map.entry("familyHx", "Diabetes (mother)"), Map.entry("allergicHx", "NKDA"),
                 Map.entry("socialSmoker", "No"), Map.entry("socialAlcohol", "No"), Map.entry("socialSleep", "Normal"),
                 Map.entry("drugHx", "None"), Map.entry("physicalExamination", "Chest clear")
-        ), "doctor", Map.class);
+        );
+        put(mhUrl(stay), sent, "doctor", Map.class);
 
         var after = get(mhUrl(stay), "premature");
         var form = (Map<String, Object>) after.get("form");
-        assertThat(form.get("chiefComplaint")).isEqualTo("Fever for 2 days");
-        assertThat(form.get("physicalExamination")).isEqualTo("Chest clear");
+        for (var entry : sent.entrySet()) {
+            if (entry.getKey().equals("weightKg") || entry.getKey().equals("heightCm")) continue; // numeric repr differs
+            assertThat(form.get(entry.getKey())).as(entry.getKey()).isEqualTo(entry.getValue());
+        }
+        assertThat(((Number) form.get("weightKg")).doubleValue()).isEqualTo(3.2);
+        assertThat(((Number) form.get("heightCm")).doubleValue()).isEqualTo(49.0);
         var spec = (Map<String, Object>) form.get("specialistSignature");
         assertThat(spec.get("present")).isEqualTo(false);
     }
