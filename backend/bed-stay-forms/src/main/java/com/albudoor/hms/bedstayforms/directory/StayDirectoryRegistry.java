@@ -23,6 +23,13 @@ public class StayDirectoryRegistry {
         }
     }
 
+    /** 404 if the department has no directory bean. */
+    public StayDirectory directory(StayDepartment department) {
+        StayDirectory d = byDepartment.get(department);
+        if (d == null) throw new NotFoundException("No bed-stay directory for " + department);
+        return d;
+    }
+
     /** 404 if the department has no directory bean or the stay doesn't exist. */
     public StayInfo require(StayDepartment department, UUID stayId) {
         StayDirectory d = byDepartment.get(department);

@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface StayDirectory {
     StayDepartment department();
     Optional<StayInfo> find(UUID stayId);
+
+    /** Forwarded Lab/Radiology/ECO orders placed from this stay (child visits). */
+    java.util.List<StayOrderRef> orders(UUID stayId);
 }

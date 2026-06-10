@@ -219,4 +219,70 @@ class StayDocumentsIT extends IntegrationTest {
         assertThat(closedUp.getStatusCode().value()).isEqualTo(422);
         assertThat(closedUp.getBody()).contains("STAY_CLOSED");
     }
+
+    /**
+     * Orders LAB from the stay as doctor, opens the dept case as lab (synchronous —
+     * cf. PrematureOrdersIT.driveLabChildToCompleted) and uploads result.png as lab.
+     * Returns the case attachment id.
+     */
+    @SuppressWarnings("unchecked")
+    String orderLabAndUploadResult(String stay) {
+        // payment approval flips the admission to UNDER_CARE asynchronously; orders need UNDER_CARE
+        await().atMost(ofSeconds(5)).untilAsserted(() ->
+                assertThat(admissions.findById(UUID.fromString(stay)).get().getStatus())
+                        .isEqualTo(AdmissionStatus.UNDER_CARE));
+        var order = post("/api/premature/admissions/" + stay + "/orders",
+                Map.of("targetType", "LABORATORY"), "doctor", Map.class);
+        String forwardedVisitId = (String) order.get("visitId");
+
+        // the receiving lab opens the case on the forwarded visit (creates the DepartmentCase)
+        var item = post("/api/catalogue/items", Map.of("category", "LAB", "code", "CBC-" + System.nanoTime(),
+                "nameEn", "Complete Blood Count", "fee", 5000, "currency", "IQD"), "admin", Map.class);
+        var deptCase = post("/api/dept-cases/open",
+                Map.of("category", "LAB", "visitId", forwardedVisitId,
+                        "services", List.of(Map.of("serviceItemId", item.get("id"), "quantity", 1))),
+                "lab", Map.class);
+
+        // lab attaches the result file — multipart per CaseAttachmentFinalizedIT
+        HttpHeaders h = auth("lab");
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+        var filePart = new HttpHeaders();
+        filePart.setContentType(MediaType.IMAGE_PNG);
+        var form = new LinkedMultiValueMap<String, Object>();
+        form.add("file", new HttpEntity<>(new ByteArrayResource(PNG) {
+            @Override public String getFilename() { return "result.png"; }
+        }, filePart));
+        var up = rest.exchange(
+                "/api/dept-cases/" + deptCase.get("id") + "/services/" + item.get("id") + "/attachments",
+                HttpMethod.POST, new HttpEntity<>(form, h), Map.class);
+        assertThat(up.getStatusCode().is2xxSuccessful()).as("%s", up.getBody()).isTrue();
+        return (String) up.getBody().get("id");
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void lab_result_attachment_appears_in_merged_list_and_streams_stay_scoped() {
+        String stay = admitUnderCare();
+        orderLabAndUploadResult(stay);
+
+        var list = rest.exchange(docsUrl(stay), HttpMethod.GET, new HttpEntity<>(auth("premature")), List.class);
+        List<Map<String, Object>> docs = list.getBody();
+        var result = docs.stream().filter(d -> "LABORATORY".equals(d.get("source"))).findFirst().orElseThrow();
+        assertThat(result.get("fileName")).isEqualTo("result.png");
+        String fileUrl = (String) result.get("fileUrl");
+
+        var img = rest.exchange(fileUrl, HttpMethod.GET, new HttpEntity<>(auth("premature")), byte[].class);
+        assertThat(img.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(img.getBody()).isEqualTo(PNG);
+    }
+
+    @Test
+    void result_attachment_of_another_stay_is_not_streamable() {
+        // two stays; attachment belongs to stay A's order; stream via stay B's URL -> 404
+        String stayA = admitUnderCare();
+        String stayB = admitUnderCare();
+        String attachmentId = orderLabAndUploadResult(stayA);
+        var denied = rest.exchange(docsUrl(stayB) + "/results/" + attachmentId + "/file",
+                HttpMethod.GET, new HttpEntity<>(auth("premature")), String.class);
+        assertThat(denied.getStatusCode().value()).isEqualTo(404);
+    }
 }

@@ -66,6 +66,23 @@ public class StayDocumentsController {
                 .body(new InputStreamResource(storage.open(d.getStorageKey())));
     }
 
+    @GetMapping("/results/{attachmentId}/file")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Resource> resultFile(@PathVariable StayDepartment department,
+                                               @PathVariable UUID stayId,
+                                               @PathVariable UUID attachmentId) throws IOException {
+        access.checkRead(department);
+        var a = handler.requireResultAttachment(department, stayId, attachmentId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(a.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.inline()
+                                .filename(a.getFileName(), java.nio.charset.StandardCharsets.UTF_8)
+                                .build().toString())
+                .contentLength(a.getSizeBytes())
+                .body(new InputStreamResource(storage.open(a.getStorageKey())));
+    }
+
     @PostMapping("/{documentId}/archive")
     @PreAuthorize("isAuthenticated()")
     public StayDocumentDto archive(@PathVariable StayDepartment department, @PathVariable UUID stayId,

@@ -3,9 +3,12 @@ package com.albudoor.hms.bedstayforms.documents;
 import com.albudoor.hms.bedstayforms.api.StayDocumentDto;
 import com.albudoor.hms.bedstayforms.directory.StayDirectoryRegistry;
 import com.albudoor.hms.bedstayforms.directory.StayInfo;
+import com.albudoor.hms.bedstayforms.directory.StayOrderRef;
 import com.albudoor.hms.bedstayforms.domain.StayDepartment;
 import com.albudoor.hms.bedstayforms.domain.StayDocument;
 import com.albudoor.hms.bedstayforms.infrastructure.StayDocumentRepository;
+import com.albudoor.hms.departmentservices.infrastructure.CaseAttachmentRepository;
+import com.albudoor.hms.departmentservices.infrastructure.DepartmentCaseRepository;
 import com.albudoor.hms.platform.exception.DomainException;
 import com.albudoor.hms.platform.exception.NotFoundException;
 import com.albudoor.hms.platform.storage.FileStorage;
@@ -31,12 +34,17 @@ public class StayDocumentsHandler {
     private final StayDocumentRepository documents;
     private final StayDirectoryRegistry stays;
     private final FileStorage storage;
+    private final DepartmentCaseRepository deptCases;
+    private final CaseAttachmentRepository caseAttachments;
 
     public StayDocumentsHandler(StayDocumentRepository documents, StayDirectoryRegistry stays,
-                                FileStorage storage) {
+                                FileStorage storage, DepartmentCaseRepository deptCases,
+                                CaseAttachmentRepository caseAttachments) {
         this.documents = documents;
         this.stays = stays;
         this.storage = storage;
+        this.deptCases = deptCases;
+        this.caseAttachments = caseAttachments;
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +55,30 @@ public class StayDocumentsHandler {
         for (StayDocument d : documents.findAllByDepartmentAndStayIdOrderByCreatedAtDesc(dept, stayId)) {
             out.add(StayDocumentDto.fromUpload(d, base + d.getId() + "/file"));
         }
+        for (StayOrderRef order : stays.directory(dept).orders(stayId)) {
+            deptCases.findByVisitId(order.visitId()).ifPresent(c ->
+                    caseAttachments.findAllByCaseIdOrderByUploadedAtAsc(c.getId()).forEach(a ->
+                            out.add(StayDocumentDto.fromResultAttachment(a.getId(), order.targetType(),
+                                    a.getFileName(), a.getContentType(), a.getSizeBytes(),
+                                    a.getUploadedBy(), a.getUploadedAt(),
+                                    base + "results/" + a.getId() + "/file"))));
+        }
+        out.sort(java.util.Comparator.comparing(StayDocumentDto::uploadedAt).reversed());
         return out;
+    }
+
+    @Transactional(readOnly = true)
+    public com.albudoor.hms.departmentservices.domain.CaseAttachment requireResultAttachment(
+            StayDepartment dept, UUID stayId, UUID attachmentId) {
+        stays.require(dept, stayId);
+        var attachment = caseAttachments.findById(attachmentId)
+                .orElseThrow(() -> new NotFoundException("Attachment not found: " + attachmentId));
+        boolean belongs = stays.directory(dept).orders(stayId).stream()
+                .map(o -> deptCases.findByVisitId(o.visitId()))
+                .flatMap(java.util.Optional::stream)
+                .anyMatch(c -> c.getId().equals(attachment.getCaseId()));
+        if (!belongs) throw new NotFoundException("Attachment not found on this stay: " + attachmentId);
+        return attachment;
     }
 
     @Transactional
