@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/shared/api/client';
 import { cn } from '@/shared/ui/cn';
-import { SignaturePad } from './SignaturePad';
+import { SignaturePad } from '@/shared/ui/SignaturePad';
 import { BedStayCasePage, type BedStayActions } from '@/features/beds/case/BedStayCasePage';
 import type { BedStayCaseView } from '@/features/beds/case/types';
 import {

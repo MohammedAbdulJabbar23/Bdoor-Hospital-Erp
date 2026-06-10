@@ -23,7 +23,10 @@ export type BedStayActions = {
   onReissue?: () => Promise<unknown>;
 };
 
-type TabKey = 'overview' | 'LABORATORY' | 'RADIOLOGY' | 'ECO' | 'clinical' | 'billing' | 'timeline';
+type BuiltinTabKey = 'overview' | 'LABORATORY' | 'RADIOLOGY' | 'ECO' | 'clinical' | 'billing' | 'timeline';
+type TabKey = BuiltinTabKey | (string & {});
+
+export type ExtraTab = { key: string; label: string; content: ReactNode };
 
 const TARGET_ICON: Record<OrderTargetType, typeof FlaskConical> = {
   LABORATORY: FlaskConical,
@@ -37,7 +40,7 @@ function fmt(iso?: string | null): string {
 }
 
 export function BedStayCasePage({
-  backTo, backLabel, view, orders, ordersLoading, statusLabel, canExtend, clinical, actions,
+  backTo, backLabel, view, orders, ordersLoading, statusLabel, canExtend, clinical, actions, extraTabs,
 }: {
   backTo: string;
   backLabel: string;
@@ -48,6 +51,7 @@ export function BedStayCasePage({
   canExtend: boolean;
   clinical: ReactNode;
   actions: BedStayActions;
+  extraTabs?: ExtraTab[];
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -103,9 +107,12 @@ export function BedStayCasePage({
     { key: 'RADIOLOGY', label: t('caseView.tabs.radiology'), count: ordersByTarget.RADIOLOGY.length },
     { key: 'ECO', label: t('caseView.tabs.eco'), count: ordersByTarget.ECO.length },
     { key: 'clinical', label: t('caseView.tabs.clinical') },
+    ...(extraTabs ?? []).map((e) => ({ key: e.key as TabKey, label: e.label })),
     { key: 'billing', label: t('caseView.tabs.billing') },
     { key: 'timeline', label: t('caseView.tabs.timeline') },
   ];
+
+  const activeExtra = (extraTabs ?? []).find((e) => e.key === tab);
 
   return (
     <div className="space-y-4 p-1">
@@ -178,17 +185,21 @@ export function BedStayCasePage({
         ))}
       </div>
 
-      {tab === 'overview' && (
-        <OverviewTab view={view} statusLabel={statusLabel} busy={busy}
-          onSaveNote={(n) => run(() => actions.onSetDischargeNote(n), t('caseView.noteSaved'))} t={t} />
+      {activeExtra ? activeExtra.content : (
+        <>
+          {tab === 'overview' && (
+            <OverviewTab view={view} statusLabel={statusLabel} busy={busy}
+              onSaveNote={(n) => run(() => actions.onSetDischargeNote(n), t('caseView.noteSaved'))} t={t} />
+          )}
+          {(tab === 'LABORATORY' || tab === 'RADIOLOGY' || tab === 'ECO') && (
+            <OrdersTab target={tab as OrderTargetType} orders={ordersByTarget[tab]} loading={ordersLoading} canOrder={active} busy={busy}
+              onOrder={(note) => run(() => actions.onOrder(tab as OrderTargetType, note), t('caseView.ordered'))} t={t} />
+          )}
+          {tab === 'clinical' && <div>{clinical}</div>}
+          {tab === 'billing' && <BillingTab view={view} t={t} />}
+          {tab === 'timeline' && <TimelineTab view={view} orders={orders} statusLabel={statusLabel} t={t} />}
+        </>
       )}
-      {(tab === 'LABORATORY' || tab === 'RADIOLOGY' || tab === 'ECO') && (
-        <OrdersTab target={tab} orders={ordersByTarget[tab]} loading={ordersLoading} canOrder={active} busy={busy}
-          onOrder={(note) => run(() => actions.onOrder(tab, note), t('caseView.ordered'))} t={t} />
-      )}
-      {tab === 'clinical' && <div>{clinical}</div>}
-      {tab === 'billing' && <BillingTab view={view} t={t} />}
-      {tab === 'timeline' && <TimelineTab view={view} orders={orders} statusLabel={statusLabel} t={t} />}
 
       {pendingMsg !== null && (
         <ResultsPendingDialog

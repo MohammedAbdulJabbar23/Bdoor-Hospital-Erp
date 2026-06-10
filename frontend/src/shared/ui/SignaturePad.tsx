@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/shared/api/client';
-import { uploadSignature, fetchSignatureUrl, type SignatureSlot, type SigMeta } from './api';
+import { uploadSignature, fetchSignatureUrl, type SignatureSlot, type SigMeta } from '@/features/premature/api';
 
 export function SignaturePad({
   admissionId, slot, label, meta, onSaved, t,
