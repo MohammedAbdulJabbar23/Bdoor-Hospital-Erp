@@ -14,7 +14,11 @@ export function NursingTab({ department, stayId, readOnly }: {
   const { data: rows, isLoading } = useQuery({ queryKey, queryFn: () => listNursingProcedures(department, stayId) });
 
   const [procedureName, setProcedureName] = useState('');
-  const [performedAt, setPerformedAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [performedAt, setPerformedAt] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  });
   const [note, setNote] = useState('');
 
   const add = useMutation({

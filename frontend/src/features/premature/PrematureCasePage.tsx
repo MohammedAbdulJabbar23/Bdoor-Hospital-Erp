@@ -9,6 +9,9 @@ import { cn } from '@/shared/ui/cn';
 import { SignaturePad } from '@/shared/ui/SignaturePad';
 import { BedStayCasePage, type BedStayActions } from '@/features/beds/case/BedStayCasePage';
 import type { BedStayCaseView } from '@/features/beds/case/types';
+import { MedicalHistoryTab } from '@/features/beds/case/forms/MedicalHistoryTab';
+import { NursingTab } from '@/features/beds/case/forms/NursingTab';
+import { TreatmentTab } from '@/features/beds/case/forms/TreatmentTab';
 import {
   getPrematureCase, listOrders, orderWorkup, setDischargeNote, finishTreatment,
   extendStay, reissueDischargePayment, upsertPrematureForm, recordTour,
@@ -58,6 +61,16 @@ export function PrematureCasePage() {
     onReissue: async () => { await reissueDischargePayment(id!); await invalidate(); },
   };
 
+  const readOnly = a.status === 'CLOSED' || a.status === 'CANCELLED';
+  const extraTabs = [
+    { key: 'history', label: t('caseView.tabs.history'),
+      content: <MedicalHistoryTab department="PREMATURE" stayId={id!} readOnly={readOnly} /> },
+    { key: 'nursing', label: t('caseView.tabs.nursing'),
+      content: <NursingTab department="PREMATURE" stayId={id!} readOnly={readOnly} /> },
+    { key: 'treatment', label: t('caseView.tabs.treatment'),
+      content: <TreatmentTab department="PREMATURE" stayId={id!} readOnly={readOnly} /> },
+  ];
+
   return (
     <BedStayCasePage
       backTo="/departments/premature"
@@ -68,6 +81,7 @@ export function PrematureCasePage() {
       statusLabel={(code) => t(`premature.admissionStatus.${code}`)}
       canExtend
       actions={actions}
+      extraTabs={extraTabs}
       clinical={
         <PrematureClinical
           c={c} admissionId={id!}

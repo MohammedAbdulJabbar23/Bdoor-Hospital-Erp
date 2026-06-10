@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Siren } from 'lucide-react';
 import { BedStayCasePage, type BedStayActions } from '@/features/beds/case/BedStayCasePage';
 import type { BedStayCaseView } from '@/features/beds/case/types';
+import { MedicalHistoryTab } from '@/features/beds/case/forms/MedicalHistoryTab';
+import { NursingTab } from '@/features/beds/case/forms/NursingTab';
+import { TreatmentTab } from '@/features/beds/case/forms/TreatmentTab';
 import {
   getCase, listOrders, orderWorkup, setDischargeNote, finishTreatment, reissueDischargePayment,
 } from './api';
@@ -47,6 +50,16 @@ export function EmergencyCasePage() {
     onReissue: async () => { await reissueDischargePayment(id!); await invalidate(); },
   };
 
+  const readOnly = c.status === 'CLOSED' || c.status === 'CANCELLED';
+  const extraTabs = [
+    { key: 'history', label: t('caseView.tabs.history'),
+      content: <MedicalHistoryTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
+    { key: 'nursing', label: t('caseView.tabs.nursing'),
+      content: <NursingTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
+    { key: 'treatment', label: t('caseView.tabs.treatment'),
+      content: <TreatmentTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
+  ];
+
   return (
     <BedStayCasePage
       backTo="/departments/emergency"
@@ -57,6 +70,7 @@ export function EmergencyCasePage() {
       statusLabel={(code) => t(`emergency.caseStatus.${code}`)}
       canExtend={false}
       actions={actions}
+      extraTabs={extraTabs}
       clinical={
         <div className="rounded-xl border border-ink-100 bg-white p-4 text-sm">
           <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-ink-900">
