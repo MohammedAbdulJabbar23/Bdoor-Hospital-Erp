@@ -21,9 +21,9 @@ public interface FileStorage {
     boolean delete(String storageKey) throws IOException;
 
     /**
-     * Persist bytes computing SHA-256 + size in the same pass. Default implementation for
-     * any non-local backend wraps {@link #save}; LocalFileSystemStorage overrides for a
-     * single-pass streaming hash.
+     * Persist bytes computing SHA-256 + size in the same pass. Implementations must compute
+     * the hash during the write (single pass). The returned sha256 is lowercase hex.
+     * The given stream is consumed and closed.
      */
     StoredBlob saveVerified(InputStream in, String suggestedName) throws IOException;
 }

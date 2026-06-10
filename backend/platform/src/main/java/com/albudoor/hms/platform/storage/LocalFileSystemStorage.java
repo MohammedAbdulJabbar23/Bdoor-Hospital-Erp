@@ -34,8 +34,8 @@ public class LocalFileSystemStorage implements FileStorage {
         this.root = Path.of(dir).toAbsolutePath().normalize();
         Files.createDirectories(this.root);
         log.info("FileStorage rooted at {}", this.root);
-        if ("data/attachments".equals(dir)) {
-            log.warn("hms.attachments.dir is the RELATIVE default ('data/attachments') — the "
+        if (!Path.of(dir).isAbsolute()) {
+            log.warn("hms.attachments.dir is a RELATIVE path ('" + dir + "') — the "
                     + "storage root depends on the launch directory. Set an absolute path in "
                     + "configuration to avoid scattered document roots (see docs/OPERATIONS.md).");
         }
@@ -47,7 +47,12 @@ public class LocalFileSystemStorage implements FileStorage {
         String key = LocalDate.now() + "/" + UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
         Path target = root.resolve(key);
         Files.createDirectories(target.getParent());
-        Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Files.deleteIfExists(target);
+            throw e;
+        }
         return key;
     }
 
@@ -58,7 +63,7 @@ public class LocalFileSystemStorage implements FileStorage {
         if (!p.startsWith(root)) {
             throw new IOException("Refusing to open path outside storage root: " + storageKey);
         }
-        if (!Files.exists(p)) throw new StorageMissingException(storageKey);
+        if (Files.notExists(p)) throw new StorageMissingException(storageKey);
         return Files.newInputStream(p);
     }
 
@@ -84,8 +89,13 @@ public class LocalFileSystemStorage implements FileStorage {
             throw new IllegalStateException(e); // JDK guarantees SHA-256
         }
         long size;
-        try (var digestIn = new java.security.DigestInputStream(in, md)) {
-            size = Files.copy(digestIn, target, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            try (var digestIn = new java.security.DigestInputStream(in, md)) {
+                size = Files.copy(digestIn, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            Files.deleteIfExists(target);
+            throw e;
         }
         return new StoredBlob(key, java.util.HexFormat.of().formatHex(md.digest()), size);
     }
