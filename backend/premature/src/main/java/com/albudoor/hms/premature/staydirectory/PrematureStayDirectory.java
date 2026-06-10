@@ -8,6 +8,7 @@ import com.albudoor.hms.bedstayforms.domain.StayDepartment;
 import com.albudoor.hms.patientregistry.infrastructure.PatientRepository;
 import com.albudoor.hms.premature.domain.AdmissionStatus;
 import com.albudoor.hms.premature.infrastructure.PrematureAdmissionRepository;
+import com.albudoor.hms.visitmanagement.domain.VisitType;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
 import org.springframework.stereotype.Component;
 
@@ -51,6 +52,9 @@ public class PrematureStayDirectory implements StayDirectory {
     public List<StayOrderRef> orders(UUID stayId) {
         return admissions.findById(stayId)
                 .map(a -> visits.findAllByParentVisitIdOrderByStartedAtDesc(a.getVisitId()).stream()
+                        .filter(v -> v.getVisitType() == VisitType.LABORATORY
+                                || v.getVisitType() == VisitType.RADIOLOGY
+                                || v.getVisitType() == VisitType.ECO)
                         .map(v -> new StayOrderRef(v.getId(), v.getVisitType().name(), v.getStartedAt()))
                         .toList())
                 .orElse(List.of());

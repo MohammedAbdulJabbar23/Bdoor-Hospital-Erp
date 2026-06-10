@@ -8,6 +8,7 @@ import com.albudoor.hms.bedstayforms.domain.StayDepartment;
 import com.albudoor.hms.emergency.domain.EmergencyCaseStatus;
 import com.albudoor.hms.emergency.infrastructure.EmergencyCaseRepository;
 import com.albudoor.hms.patientregistry.infrastructure.PatientRepository;
+import com.albudoor.hms.visitmanagement.domain.VisitType;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
 import org.springframework.stereotype.Component;
 
@@ -51,6 +52,9 @@ public class EmergencyStayDirectory implements StayDirectory {
     public List<StayOrderRef> orders(UUID stayId) {
         return cases.findById(stayId)
                 .map(c -> visits.findAllByParentVisitIdOrderByStartedAtDesc(c.getVisitId()).stream()
+                        .filter(v -> v.getVisitType() == VisitType.LABORATORY
+                                || v.getVisitType() == VisitType.RADIOLOGY
+                                || v.getVisitType() == VisitType.ECO)
                         .map(v -> new StayOrderRef(v.getId(), v.getVisitType().name(), v.getStartedAt()))
                         .toList())
                 .orElse(List.of());
