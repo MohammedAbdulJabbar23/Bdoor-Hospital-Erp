@@ -59,7 +59,7 @@ export function ProfileHeader({ patient }: { patient: PatientResponse }) {
               {patient.gender === 'MALE' ? t('patientProfile.male') : t('patientProfile.female')}
             </Chip>
             <Chip icon={Calendar} label={t('patientProfile.dob')}>
-              {patient.dateOfBirth} <span className="text-ink-500">· {computeAge(patient.dateOfBirth)}</span>
+              {new Date(patient.dateOfBirth).toLocaleDateString()} <span className="text-ink-500">· {computeAge(patient.dateOfBirth)}</span>
             </Chip>
             {contact && (
               <Chip icon={Phone} label={t('patientProfile.mobile')}>

@@ -106,12 +106,15 @@ export function UnifiedTimeline({ timeline, renderExamFor }: {
                   {e.type === 'DOCUMENT' && e.refs.fileUrl && (
                     <button
                       type="button"
-                      onClick={() => setPreview({
-                        fileUrl: e.refs.fileUrl!,
-                        fileName: e.title,
-                        // Simplification: content type guessed from the title extension (pdf vs image).
-                        contentType: e.title.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/png',
-                      })}
+                      onClick={() => {
+                        const filename = e.title.split(' — ')[0].trim();
+                        return setPreview({
+                          fileUrl: e.refs.fileUrl!,
+                          fileName: filename,
+                          // Content type guessed from filename extension (pdf vs image).
+                          contentType: filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/png',
+                        });
+                      }}
                       className="inline-flex shrink-0 items-center gap-1 rounded-md border border-ink-200 px-2 py-1 text-xs font-medium text-ink-700 hover:bg-ink-50"
                     >
                       <Eye size={12} /> {t('patientProfile.timeline.view')}
