@@ -1,13 +1,18 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ChevronRight, User as UserIcon, FlaskConical, Scan, Activity,
+  ArrowLeft, ChevronDown, ChevronRight, User as UserIcon, FlaskConical, Scan, Activity,
   CheckCircle2, Clock, CalendarPlus, Receipt, ClipboardList, X as XIcon,
+  FileText, Image as ImageIcon, Eye,
 } from 'lucide-react';
 import { extractApiError } from '@/shared/api/client';
 import { cn } from '@/shared/ui/cn';
+import { DocumentPreview } from '@/shared/ui/DocumentPreview';
+import { getOrderResults, type StayDoc } from './forms/documentsApi';
+import type { StayDepartment } from './forms/api';
 import {
   type BedStayCaseView, type OrderView, type OrderTargetType,
   isUnderTreatment, statusToneClass,
@@ -40,10 +45,12 @@ function fmt(iso?: string | null): string {
 }
 
 export function BedStayCasePage({
-  backTo, backLabel, view, orders, ordersLoading, statusLabel, canExtend, clinical, actions, extraTabs,
+  backTo, backLabel, department, stayId, view, orders, ordersLoading, statusLabel, canExtend, clinical, actions, extraTabs,
 }: {
   backTo: string;
   backLabel: string;
+  department: StayDepartment;
+  stayId: string;
   view: BedStayCaseView;
   orders: OrderView[];
   ordersLoading?: boolean;
@@ -192,7 +199,8 @@ export function BedStayCasePage({
               onSaveNote={(n) => run(() => actions.onSetDischargeNote(n), t('caseView.noteSaved'))} t={t} />
           )}
           {(tab === 'LABORATORY' || tab === 'RADIOLOGY' || tab === 'ECO') && (
-            <OrdersTab target={tab as OrderTargetType} orders={ordersByTarget[tab]} loading={ordersLoading} canOrder={active} busy={busy}
+            <OrdersTab target={tab as OrderTargetType} department={department} stayId={stayId}
+              orders={ordersByTarget[tab]} loading={ordersLoading} canOrder={active} busy={busy}
               onOrder={(note) => run(() => actions.onOrder(tab as OrderTargetType, note), t('caseView.ordered'))} t={t} />
           )}
           {tab === 'clinical' && <div>{clinical}</div>}
@@ -275,12 +283,14 @@ function OverviewTab({ view, statusLabel, busy, onSaveNote, t }: {
   );
 }
 
-function OrdersTab({ target, orders, loading, canOrder, busy, onOrder, t }: {
-  target: OrderTargetType; orders: OrderView[]; loading?: boolean; canOrder: boolean; busy: boolean;
+function OrdersTab({ target, department, stayId, orders, loading, canOrder, busy, onOrder, t }: {
+  target: OrderTargetType; department: StayDepartment; stayId: string;
+  orders: OrderView[]; loading?: boolean; canOrder: boolean; busy: boolean;
   onOrder: (note: string) => void; t: (k: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const Icon = TARGET_ICON[target];
   return (
     <div className="space-y-3">
@@ -304,8 +314,18 @@ function OrdersTab({ target, orders, loading, canOrder, busy, onOrder, t }: {
                 <div className="flex flex-wrap items-center gap-2">
                   <Icon size={14} className="text-ink-400" />
                   <span className="font-mono text-xs text-ink-700">{o.visitDisplayId}</span>
-                  <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-medium text-ink-600">{o.status}</span>
+                  <span title={o.status}
+                    className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium',
+                      o.resultsAt ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>
+                    {o.resultsAt ? t('caseView.orderStatus.resultsReady') : t('caseView.orderStatus.awaitingResults')}
+                  </span>
                   <span className="ms-auto text-[11px] text-ink-400">{fmt(o.startedAt)}</span>
+                  <button type="button" onClick={() => setExpanded((m) => ({ ...m, [o.visitId]: !m[o.visitId] }))}
+                    className="rounded p-1 text-ink-400 hover:bg-ink-50 hover:text-ink-700"
+                    data-testid={`order-expand-${o.visitId}`}
+                    aria-expanded={!!expanded[o.visitId]}>
+                    <ChevronDown size={15} className={cn('transition-transform', expanded[o.visitId] && 'rotate-180')} />
+                  </button>
                 </div>
                 {o.note && (
                   <p className="mt-1.5 text-xs text-ink-600"><span className="font-medium text-ink-500">{t('caseView.note')}:</span> {o.note}</p>
@@ -313,8 +333,11 @@ function OrdersTab({ target, orders, loading, canOrder, busy, onOrder, t }: {
                 {o.resultsSummary && (
                   <p className="mt-1.5 rounded-md bg-emerald-50 px-2 py-1.5 text-xs text-emerald-800">
                     <span className="font-medium">{t('caseView.result')}:</span> {o.resultsSummary}
+                    {o.resultsAt && <span className="ms-2 text-[11px] text-emerald-600">{fmt(o.resultsAt)}</span>}
                   </p>
                 )}
+                <OrderResultsPanel department={department} stayId={stayId} visitId={o.visitId}
+                  expanded={!!expanded[o.visitId]} t={t} />
               </li>
             ))}
           </ul>
@@ -345,6 +368,78 @@ function OrdersTab({ target, orders, loading, canOrder, busy, onOrder, t }: {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function OrderResultsPanel({ department, stayId, visitId, expanded, t }: {
+  department: StayDepartment; stayId: string; visitId: string; expanded: boolean; t: (k: string) => string;
+}) {
+  const [preview, setPreview] = useState<StayDoc | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ['order-results', department, stayId, visitId],
+    queryFn: () => getOrderResults(department, stayId, visitId),
+    enabled: expanded,
+  });
+
+  if (!expanded) return null;
+
+  const services = data?.services ?? [];
+  const documents = data?.documents ?? [];
+
+  return (
+    <div className="mt-2.5 space-y-3 rounded-md border border-ink-100 bg-ink-50/40 p-3" data-testid={`order-results-${visitId}`}>
+      {isLoading ? (
+        <p className="text-xs text-ink-400">{t('common.loading')}</p>
+      ) : services.length === 0 && documents.length === 0 ? (
+        <p className="text-xs text-ink-400">{t('caseView.orderStatus.nothingYet')}</p>
+      ) : (
+        <>
+          {services.length > 0 && (
+            <div>
+              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{t('caseView.orderResults.findings')}</h4>
+              <ul className="space-y-1.5">
+                {services.map((s, i) => (
+                  <li key={i} className="text-xs text-ink-700">
+                    <span className="font-semibold text-ink-900">{s.serviceName}</span>
+                    <span className="ms-2">{s.findings?.trim() ? s.findings : '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {documents.length > 0 && (
+            <div>
+              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{t('caseView.orderResults.documents')}</h4>
+              <ul className="divide-y divide-ink-100">
+                {documents.map((d) => (
+                  <li key={d.id} className="flex items-center gap-2.5 py-1.5">
+                    {d.contentType.startsWith('image/')
+                      ? <ImageIcon size={15} className="shrink-0 text-ink-400" />
+                      : <FileText size={15} className="shrink-0 text-ink-400" />}
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-900">{d.fileName}</span>
+                    <span className="text-[11px] text-ink-400">{fmtSize(d.sizeBytes)}</span>
+                    <button type="button" onClick={() => setPreview(d)} data-testid={`order-doc-view-${d.fileName}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs hover:bg-ink-50">
+                      <Eye size={12} /> {t('caseView.documents.view')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+      {preview && (
+        <DocumentPreview fileUrl={preview.fileUrl} fileName={preview.fileName}
+          contentType={preview.contentType} onClose={() => setPreview(null)} />
       )}
     </div>
   );

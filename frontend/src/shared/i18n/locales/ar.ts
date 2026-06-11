@@ -339,6 +339,15 @@ export default {
       reason: 'سبب الإنهاء رغم ذلك',
       finishAnyway: 'إنهاء على أي حال',
     },
+    orderStatus: {
+      awaitingResults: 'بانتظار النتائج',
+      resultsReady: 'النتائج جاهزة',
+      nothingYet: 'لا توجد نتائج بعد',
+    },
+    orderResults: {
+      findings: 'النتائج',
+      documents: 'المستندات',
+    },
     timeline: {
       admitted: 'الإدخال', orderSent: 'إرسال طلب', resultsBack: 'عودة النتائج',
       treatmentFinished: 'انتهاء العلاج', discharged: 'الخروج', now: 'الآن',

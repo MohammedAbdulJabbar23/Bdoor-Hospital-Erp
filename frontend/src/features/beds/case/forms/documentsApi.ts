@@ -17,6 +17,17 @@ export type StayDoc = {
   sha256: string | null;
 };
 
+export type ServiceFinding = { serviceName: string; findings: string | null };
+
+export type OrderResults = { services: ServiceFinding[]; documents: StayDoc[] };
+
+export async function getOrderResults(
+  dept: StayDepartment, stayId: string, visitId: string,
+): Promise<OrderResults> {
+  const res = await api.get(`/bed-stays/${dept}/${stayId}/orders/${visitId}/results`);
+  return res.data;
+}
+
 export async function listDocuments(dept: StayDepartment, stayId: string): Promise<StayDoc[]> {
   const res = await api.get(`/bed-stays/${dept}/${stayId}/documents`);
   return res.data;

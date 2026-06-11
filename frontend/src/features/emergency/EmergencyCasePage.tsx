@@ -74,6 +74,8 @@ export function EmergencyCasePage() {
     <BedStayCasePage
       backTo="/departments/emergency"
       backLabel={t('emergency.detail.title')}
+      department="EMERGENCY"
+      stayId={id!}
       view={view}
       orders={ordersQuery.data ?? []}
       ordersLoading={ordersQuery.isLoading}

@@ -339,6 +339,15 @@ export default {
       reason: 'Reason for finishing anyway',
       finishAnyway: 'Finish anyway',
     },
+    orderStatus: {
+      awaitingResults: 'Awaiting results',
+      resultsReady: 'Results ready',
+      nothingYet: 'No results yet',
+    },
+    orderResults: {
+      findings: 'Findings',
+      documents: 'Documents',
+    },
     timeline: {
       admitted: 'Admitted', orderSent: 'Order sent', resultsBack: 'Results returned',
       treatmentFinished: 'Treatment finished', discharged: 'Discharged', now: 'Now',

@@ -89,6 +89,8 @@ export function PrematureCasePage() {
     <BedStayCasePage
       backTo="/departments/premature"
       backLabel={t('premature.detail.title')}
+      department="PREMATURE"
+      stayId={id!}
       view={view}
       orders={ordersQuery.data ?? []}
       ordersLoading={ordersQuery.isLoading}
