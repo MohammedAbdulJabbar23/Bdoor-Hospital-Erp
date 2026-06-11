@@ -8,6 +8,7 @@ import { MedicalHistoryTab } from '@/features/beds/case/forms/MedicalHistoryTab'
 import { NursingTab } from '@/features/beds/case/forms/NursingTab';
 import { TreatmentTab } from '@/features/beds/case/forms/TreatmentTab';
 import { DocumentsTab } from '@/features/beds/case/forms/DocumentsTab';
+import { listDocuments } from '@/features/beds/case/forms/documentsApi';
 import {
   getCase, listOrders, orderWorkup, setDischargeNote, finishTreatment, reissueDischargePayment,
 } from './api';
@@ -22,6 +23,11 @@ export function EmergencyCasePage() {
   });
   const ordersQuery = useQuery({
     queryKey: ['emerg-orders', id], queryFn: () => listOrders(id!), enabled: !!id,
+  });
+  const docsQuery = useQuery({
+    queryKey: ['stay-docs', 'EMERGENCY', id],
+    queryFn: () => listDocuments('EMERGENCY', id!),
+    enabled: !!id,
   });
 
   if (isLoading || !c) return <div className="p-6 text-sm text-ink-500">{t('common.loading')}</div>;
@@ -60,6 +66,7 @@ export function EmergencyCasePage() {
     { key: 'treatment', label: t('caseView.tabs.treatment'),
       content: <TreatmentTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
     { key: 'documents', label: t('caseView.tabs.documents'),
+      count: docsQuery.data?.filter((d) => !d.archived).length,
       content: <DocumentsTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
   ];
 

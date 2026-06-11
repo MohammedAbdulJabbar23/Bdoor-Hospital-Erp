@@ -93,6 +93,9 @@ public class StayDocumentsHandler {
         if (ct == null || !ALLOWED_TYPES.contains(ct)) {
             throw new DomainException("DOCUMENT_TYPE_NOT_ALLOWED", "Only images and PDF documents are allowed");
         }
+        if (label != null && label.length() > 200) {
+            throw new DomainException("DOCUMENT_LABEL_TOO_LONG", "Label is limited to 200 characters");
+        }
         String fileName = safeName(file.getOriginalFilename());
         StoredBlob blob;
         try (var in = file.getInputStream()) {

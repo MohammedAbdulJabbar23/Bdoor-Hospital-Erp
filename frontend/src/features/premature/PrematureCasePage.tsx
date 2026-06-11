@@ -13,6 +13,7 @@ import { MedicalHistoryTab } from '@/features/beds/case/forms/MedicalHistoryTab'
 import { NursingTab } from '@/features/beds/case/forms/NursingTab';
 import { TreatmentTab } from '@/features/beds/case/forms/TreatmentTab';
 import { DocumentsTab } from '@/features/beds/case/forms/DocumentsTab';
+import { listDocuments } from '@/features/beds/case/forms/documentsApi';
 import { CaseFileTab } from './CaseFileTab';
 import {
   getPrematureCase, listOrders, orderWorkup, setDischargeNote, finishTreatment,
@@ -33,6 +34,11 @@ export function PrematureCasePage() {
   });
   const ordersQuery = useQuery({
     queryKey: ['prem-orders', id], queryFn: () => listOrders(id!), enabled: !!id,
+  });
+  const docsQuery = useQuery({
+    queryKey: ['stay-docs', 'PREMATURE', id],
+    queryFn: () => listDocuments('PREMATURE', id!),
+    enabled: !!id,
   });
 
   if (isLoading || !c) return <div className="p-6 text-sm text-ink-500">{t('common.loading')}</div>;
@@ -72,6 +78,7 @@ export function PrematureCasePage() {
     { key: 'treatment', label: t('caseView.tabs.treatment'),
       content: <TreatmentTab department="PREMATURE" stayId={id!} readOnly={readOnly} /> },
     { key: 'documents', label: t('caseView.tabs.documents'),
+      count: docsQuery.data?.filter((d) => !d.archived).length,
       content: <DocumentsTab department="PREMATURE" stayId={id!} readOnly={readOnly} /> },
     { key: 'caseFile', label: t('caseView.tabs.caseFile'),
       content: <CaseFileTab c={c} admissionId={id!} readOnly={readOnly}
