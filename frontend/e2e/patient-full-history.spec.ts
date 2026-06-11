@@ -43,6 +43,15 @@ test('profile shows header, chips and a filterable timeline with documents', asy
     data: { chiefComplaint: 'Fever' },
   });
   expect(mhRes.ok(), await mhRes.text()).toBe(true);
+
+  // Doctor orders LAB from the stay — the forwarded child visit must be rolled into the
+  // admission, NOT shown as a separate timeline entry (de-duplicated timeline).
+  const orderRes = await doctor.post(`${API_BASE}/premature/admissions/${admissionId}/orders`, {
+    data: { targetType: 'LABORATORY' },
+  });
+  expect(orderRes.ok(), await orderRes.text()).toBe(true);
+  const forwardedDisplayId: string = (await orderRes.json()).visitDisplayId;
+  expect(forwardedDisplayId).toBeTruthy();
   await doctor.dispose();
 
   // Nurse uploads a stay document via API (DOCUMENT timeline entry).
@@ -62,6 +71,14 @@ test('profile shows header, chips and a filterable timeline with documents', asy
   await expect(page.getByTestId('chip-visits')).toBeVisible();
   await expect(page.getByTestId('chip-documents')).toContainText('1');
 
+  // Exams pill exists in the filter bar.
+  await expect(page.getByTestId('timeline-filter-exams')).toBeVisible();
+
+  // De-dup: with the timeline loaded ('all' filter), no entry mentions the forwarded
+  // lab visit's display id — it is rolled up under the admission instead.
+  await expect(page.locator('[data-testid="timeline-entry-ADMISSION"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid^="timeline-entry-"]', { hasText: forwardedDisplayId })).toHaveCount(0);
+
   await page.getByTestId('timeline-filter-documents').click();
   await expect(page.locator('[data-testid="timeline-entry-DOCUMENT"]')).toBeVisible();
   await expect(page.locator('[data-testid="timeline-entry-DOCUMENT"]')).toContainText('stats.png');
@@ -72,4 +89,22 @@ test('profile shows header, chips and a filterable timeline with documents', asy
   await page.getByTestId('timeline-filter-admissions').click();
   await page.locator('[data-testid="timeline-entry-ADMISSION"] a').first().click();
   await expect(page).toHaveURL(/premature\/admissions/);
+});
+
+// Language-switch pattern from i18n-rtl.spec.ts: the "ع" control in the topbar LangSwitcher
+// flips i18n + document dir; timeline titles are kind/params-based so they re-render localized.
+test('Arabic profile renders localized timeline titles', async ({ page }) => {
+  const { patientId } = await seedUnderCare();
+
+  await login(page, 'doctor');
+  await page.goto(`/patients/${patientId}`);
+  await expect(page.getByTestId('profile-header')).toBeVisible();
+  await expect(page.locator('[data-testid="timeline-entry-ADMISSION"]').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'ع', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl', { timeout: 10_000 });
+
+  // 'Admitted to bed {{bed}}' → 'رقود في سرير {{bed}}' (patientProfile.timeline.kind.admissionOpened).
+  await expect(page.locator('[data-testid="timeline-entry-ADMISSION"]').first())
+    .toContainText('رقود في سرير', { timeout: 10_000 });
 });

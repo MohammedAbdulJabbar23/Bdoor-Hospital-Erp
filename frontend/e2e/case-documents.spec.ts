@@ -33,12 +33,14 @@ async function seedUnderCare(): Promise<{ admissionId: string; bedCode: string }
   return { admissionId: adm.id, bedCode };
 }
 
+type LabOrder = { visitId: string; caseId: string; serviceItemId: string };
+
 /**
  * Mirrors StayDocumentsIT.orderLabAndUploadResult over HTTP: doctor orders LAB from the
  * stay, lab opens the dept case on the forwarded visit and uploads result.png to the
  * service line (the attachment upload does not require the referral payment).
  */
-async function orderLabAndUploadResult(admissionId: string): Promise<void> {
+async function orderLabAndUploadResult(admissionId: string): Promise<LabOrder> {
   const admin = await authedContext('admin');
   const doctor = await authedContext('doctor');
   const premature = await authedContext('premature');
@@ -78,6 +80,38 @@ async function orderLabAndUploadResult(admissionId: string): Promise<void> {
   expect(upRes.ok(), await upRes.text()).toBe(true);
 
   await admin.dispose(); await doctor.dispose(); await premature.dispose(); await lab.dispose();
+  return { visitId: forwardedVisitId, caseId: deptCase.id, serviceItemId: item.id };
+}
+
+/**
+ * Mirrors StayDocumentsIT.approveReferralAndUploadFindings over HTTP, plus the finalize step
+ * from PrematureOrdersIT.driveLabChildToCompleted: approve the REFERRAL payment as cashier →
+ * await AWAITING_STUDY (the PaymentToCaseBridge fires AFTER_COMMIT) → POST findings as lab →
+ * finalize so the result returns to the stay (which is what sets resultsAt → 'Results ready').
+ */
+async function approveReferralAndUploadFindings(order: LabOrder, textFindings: string): Promise<void> {
+  const cashier = await authedContext('cashier');
+  const lab = await authedContext('lab');
+
+  const pending = await (await cashier.get(`${API_BASE}/payments?status=PENDING&size=100`)).json();
+  const referral = pending.content.find((p: any) => p.visitId === order.visitId);
+  expect(referral, `no pending referral payment for forwarded visit ${order.visitId}`).toBeTruthy();
+  const apRes = await cashier.post(`${API_BASE}/payments/${referral.id}/approve`, { data: { paymentMethod: 'CASH' } });
+  expect(apRes.ok(), await apRes.text()).toBe(true);
+
+  await expect(async () => {
+    const c = await (await lab.get(`${API_BASE}/dept-cases/${order.caseId}`)).json();
+    expect(c.status).toBe('AWAITING_STUDY');
+  }).toPass({ timeout: 10_000 });
+
+  const findRes = await lab.post(`${API_BASE}/dept-cases/${order.caseId}/findings`, {
+    data: { serviceItemId: order.serviceItemId, textFindings },
+  });
+  expect(findRes.ok(), await findRes.text()).toBe(true);
+  const finRes = await lab.post(`${API_BASE}/dept-cases/${order.caseId}/finalize`, { data: {} });
+  expect(finRes.ok(), await finRes.text()).toBe(true);
+
+  await cashier.dispose(); await lab.dispose();
 }
 
 test('upload → tagged list → preview → archive → hidden behind toggle', async ({ page }) => {
@@ -110,4 +144,23 @@ test('lab result document appears with LABORATORY badge', async ({ page }) => {
   await page.goto(`/premature/admissions/${admissionId}?tab=documents`);
   await expect(page.getByTestId('doc-rows')).toContainText('result.png', { timeout: 10_000 });
   await expect(page.getByTestId('doc-rows')).toContainText('Lab result');
+});
+
+test('lab order row shows Results ready and expands to findings + result documents', async ({ page }) => {
+  const { admissionId } = await seedUnderCare();
+  const order = await orderLabAndUploadResult(admissionId);
+  await approveReferralAndUploadFindings(order, 'WBC within normal limits');
+
+  await login(page, 'premature');
+  await page.goto(`/premature/admissions/${admissionId}?tab=LABORATORY`);
+
+  // the finalized child returns its result to the stay asynchronously → friendly status pill
+  await expect(page.getByTestId('order-list')).toContainText('Results ready', { timeout: 10_000 });
+
+  await page.getByTestId(`order-expand-${order.visitId}`).click();
+  const panel = page.getByTestId(`order-results-${order.visitId}`);
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('WBC within normal limits', { timeout: 10_000 });
+  await expect(panel).toContainText('Complete Blood Count');
+  await expect(panel).toContainText('result.png');
 });
