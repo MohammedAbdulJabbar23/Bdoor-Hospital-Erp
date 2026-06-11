@@ -60,6 +60,7 @@ class VisitResultsReturnTest {
         child.completeForwardedWith("WBC normal");
         assertThat(child.getStatus()).isEqualTo(VisitStatus.COMPLETED);
         assertThat(child.getResultsSummary()).isEqualTo("WBC normal");
+        assertThat(child.getResultsLastUpdatedAt()).isNotNull();
     }
 
     @Test

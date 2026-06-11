@@ -97,7 +97,8 @@ public class Visit extends AggregateRoot {
      * When the {@code resultsSummary} was last (re)set by a returning forwarded child. Drives the
      * Topbar notification bell's "results received within the last 24h" filter on the ORIGINATING
      * visit — the parent's {@code endedAt} stays null while it is still in progress, so it cannot
-     * be used for that purpose.
+     * be used for that purpose. Also stamped on the forwarded child at completion so department
+     * order rows can show when results arrived.
      */
     @Column(name = "results_last_updated_at")
     private Instant resultsLastUpdatedAt;

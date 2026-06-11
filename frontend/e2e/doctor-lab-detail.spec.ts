@@ -53,10 +53,12 @@ test('doctor sees full detailed lab result on the exam Lab tab', async ({ page }
     const c = await (await lab.get(`${API_BASE}/dept-cases/${dc.id}`)).json();
     expect(c.status).toBe('AWAITING_STUDY');
   }).toPass({ timeout: 10_000 });
-  await lab.post(`${API_BASE}/dept-cases/${dc.id}/findings`, {
+  const findingsResp = await lab.post(`${API_BASE}/dept-cases/${dc.id}/findings`, {
     data: { serviceItemId: svc, numericValue: 18.2, unit: 'x10^9/L', referenceRange: '4.0-11.0', flag: 'HIGH', textFindings: 'Leukocytosis.' },
   });
-  await lab.post(`${API_BASE}/dept-cases/${dc.id}/finalize`, { data: {} });
+  expect(findingsResp.ok()).toBeTruthy();
+  const finalizeResp = await lab.post(`${API_BASE}/dept-cases/${dc.id}/finalize`, { data: {} });
+  expect(finalizeResp.ok()).toBeTruthy();
 
   await admin.dispose(); await recep.dispose(); await cashier.dispose(); await doctorApi.dispose(); await lab.dispose();
 
