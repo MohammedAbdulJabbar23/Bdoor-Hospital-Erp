@@ -46,7 +46,7 @@ public class EmergencyHistoryContributor implements HistoryContributor {
             }
             sheets.findByDepartmentAndStayId(StayDepartment.EMERGENCY, c.getId()).ifPresent(s ->
                     out.add(new HistoryEntry(s.getUpdatedAt() != null ? s.getUpdatedAt() : s.getCreatedAt(),
-                            HistoryEntryType.FORM, "EMERGENCY", "Medical history sheet filed",
+                            HistoryEntryType.FORM, "EMERGENCY", "Medical history sheet",
                             s.getChiefComplaint(), HistoryRefs.stay(c.getId()))));
             charts.findAllByDepartmentAndStayIdOrderByChartDateDesc(StayDepartment.EMERGENCY, c.getId()).forEach(tc ->
                     out.add(new HistoryEntry(tc.getCreatedAt(), HistoryEntryType.FORM, "EMERGENCY",

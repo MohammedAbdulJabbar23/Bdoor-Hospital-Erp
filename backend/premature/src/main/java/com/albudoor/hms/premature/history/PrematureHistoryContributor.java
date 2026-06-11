@@ -46,7 +46,7 @@ public class PrematureHistoryContributor implements HistoryContributor {
             }
             sheets.findByDepartmentAndStayId(StayDepartment.PREMATURE, a.getId()).ifPresent(s ->
                     out.add(new HistoryEntry(s.getUpdatedAt() != null ? s.getUpdatedAt() : s.getCreatedAt(),
-                            HistoryEntryType.FORM, "PREMATURE", "Medical history sheet filed",
+                            HistoryEntryType.FORM, "PREMATURE", "Medical history sheet",
                             s.getChiefComplaint(), HistoryRefs.stay(a.getId()))));
             charts.findAllByDepartmentAndStayIdOrderByChartDateDesc(StayDepartment.PREMATURE, a.getId()).forEach(tc ->
                     out.add(new HistoryEntry(tc.getCreatedAt(), HistoryEntryType.FORM, "PREMATURE",

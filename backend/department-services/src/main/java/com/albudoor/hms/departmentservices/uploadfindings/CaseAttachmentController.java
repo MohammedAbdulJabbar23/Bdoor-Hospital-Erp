@@ -132,7 +132,7 @@ public class CaseAttachmentController {
     }
 
     @GetMapping("/attachments/{id}/file")
-    @PreAuthorize("hasAnyRole('LAB_STAFF', 'RADIOLOGY_STAFF', 'ECO_STAFF', 'DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LAB_STAFF', 'RADIOLOGY_STAFF', 'ECO_STAFF', 'DOCTOR', 'NURSE', 'ADMIN')")
     public ResponseEntity<Resource> download(@PathVariable UUID id) throws IOException {
         CaseAttachment a = attachments.findById(id)
                 .orElseThrow(() -> new NotFoundException("Attachment not found: " + id));

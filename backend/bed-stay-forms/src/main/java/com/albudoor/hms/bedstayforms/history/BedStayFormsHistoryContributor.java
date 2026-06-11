@@ -46,7 +46,7 @@ public class BedStayFormsHistoryContributor implements HistoryContributor {
         deptCases.findAllByPatientIdOrderByCreatedAtDesc(patientId).forEach(c ->
                 caseAttachments.findAllByCaseIdOrderByUploadedAtAsc(c.getId()).forEach(a ->
                         out.add(new HistoryEntry(a.getUploadedAt(), HistoryEntryType.DOCUMENT,
-                                c.getCategory() == null ? "RESULTS" : c.getCategory().name(),
+                                c.getCategory().visitType().name(),
                                 a.getFileName(), "Result document",
                                 HistoryRefs.document(a.getId(),
                                         "/api/dept-cases/attachments/" + a.getId() + "/file")))));
