@@ -134,4 +134,13 @@ class ArchitectureTest {
                 .resideInAnyPackage("..premature..", "..emergency..");
         rule.check(CLASSES);
     }
+
+    @Test
+    void clinicalCaseDoesNotDependOnDepartmentOrFormsModules() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..clinicalcase..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..premature..", "..emergency..", "..bedstayforms..");
+        rule.check(CLASSES);
+    }
 }

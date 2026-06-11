@@ -21,6 +21,8 @@ public interface PrematureAdmissionRepository extends JpaRepository<PrematureAdm
 
     List<PrematureAdmission> findAllByStatusInOrderByAdmittedAtDesc(List<AdmissionStatus> statuses);
 
+    List<PrematureAdmission> findAllByPatientIdOrderByAdmittedAtDesc(UUID patientId);
+
     boolean existsByVisitIdAndStatusIn(UUID visitId, List<AdmissionStatus> statuses);
 
     long countByStatusInAndStayExpiresAtBefore(List<AdmissionStatus> statuses, Instant threshold);

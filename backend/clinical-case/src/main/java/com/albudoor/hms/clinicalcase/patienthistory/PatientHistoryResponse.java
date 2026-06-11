@@ -11,7 +11,9 @@ import java.util.UUID;
 public record PatientHistoryResponse(
         UUID patientId,
         int totalVisits,
-        List<HistoryEntry> entries
+        List<HistoryEntry> entries,
+        /** Unified cross-module timeline (visits, exams, admissions, forms, documents), newest first. */
+        List<com.albudoor.hms.clinicalcase.history.HistoryEntry> timeline
 ) {
     public record HistoryEntry(
             UUID visitId,

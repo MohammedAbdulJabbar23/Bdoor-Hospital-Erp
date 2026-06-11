@@ -15,6 +15,7 @@ public interface EmergencyCaseRepository extends JpaRepository<EmergencyCase, UU
     Optional<EmergencyCase> findByFinalPaymentId(UUID paymentId);
     Optional<EmergencyCase> findByBedIdAndStatusIn(UUID bedId, List<EmergencyCaseStatus> statuses);
     List<EmergencyCase> findAllByStatusInOrderByAdmittedAtDesc(List<EmergencyCaseStatus> statuses);
+    List<EmergencyCase> findAllByPatientIdOrderByAdmittedAtDesc(UUID patientId);
 
     long countByStatusInAndStayExpiresAtBefore(List<EmergencyCaseStatus> statuses, Instant threshold);
 }

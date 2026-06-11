@@ -42,6 +42,10 @@
             <groupId>com.albudoor.hms</groupId>
             <artifactId>bed-stay-forms</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.albudoor.hms</groupId>
+            <artifactId>clinical-case</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
