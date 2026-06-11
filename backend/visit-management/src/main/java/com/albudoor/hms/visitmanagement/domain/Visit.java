@@ -277,6 +277,9 @@ public class Visit extends AggregateRoot {
                             + "(its payment must be approved first).");
         }
         this.resultsSummary = summary;
+        // Stamp the child too: bed-stay order rows (premature/emergency OrderResponse.resultsAt)
+        // read THIS visit's timestamp to render the "Results ready" state.
+        this.resultsLastUpdatedAt = Instant.now();
         transitionTo(VisitStatus.COMPLETED);
     }
 
