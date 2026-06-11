@@ -1079,9 +1079,21 @@ export default {
       filters: {
         all: 'All',
         visits: 'Visits',
+        exams: 'Exams',
         admissions: 'Admissions',
         forms: 'Forms',
         documents: 'Documents',
+      },
+      kind: {
+        visit: '{{visitType}} visit {{displayId}}',
+        examFinalized: 'Doctor exam finalized',
+        admissionOpened: 'Admitted to bed {{bed}}',
+        admissionClosed: 'Discharged from bed {{bed}}',
+        medicalHistorySheet: 'Medical history sheet',
+        treatmentCharts: 'Treatment charts — {{count}} day(s)',
+        nursingLog: 'Nursing procedures — {{count}} recorded',
+        documentUploaded: 'Document: {{fileName}}',
+        resultDocument: 'Result: {{fileName}} ({{visitType}})',
       },
       chips: {
         visits: 'Visits',

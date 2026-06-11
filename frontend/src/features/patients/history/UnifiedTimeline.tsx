@@ -6,11 +6,17 @@ import { DocumentPreview } from '@/shared/ui/DocumentPreview';
 import { cn } from '@/shared/ui/cn';
 import type { TimelineEntry } from '@/features/clinical/api';
 
-type FilterKey = 'all' | 'visits' | 'admissions' | 'forms' | 'documents';
+type FilterKey = 'all' | 'visits' | 'exams' | 'admissions' | 'forms' | 'documents';
 
 const FILTER_TYPE: Record<Exclude<FilterKey, 'all'>, TimelineEntry['type']> = {
-  visits: 'VISIT', admissions: 'ADMISSION', forms: 'FORM', documents: 'DOCUMENT',
+  visits: 'VISIT', exams: 'EXAM', admissions: 'ADMISSION', forms: 'FORM', documents: 'DOCUMENT',
 };
+
+/** Kinds with a `patientProfile.timeline.kind.*` template; anything else falls back to the backend title. */
+const KNOWN_KINDS = new Set([
+  'visit', 'examFinalized', 'admissionOpened', 'admissionClosed',
+  'medicalHistorySheet', 'treatmentCharts', 'nursingLog', 'documentUploaded', 'resultDocument',
+]);
 
 function dotColor(department: string): string {
   if (department === 'PREMATURE') return 'bg-brand-500';
@@ -40,15 +46,24 @@ export function UnifiedTimeline({ timeline, renderExamFor }: {
   );
 
   const counts = useMemo(() => {
-    const c: Record<FilterKey, number> = { all: timeline.length, visits: 0, admissions: 0, forms: 0, documents: 0 };
+    const c: Record<FilterKey, number> = { all: timeline.length, visits: 0, exams: 0, admissions: 0, forms: 0, documents: 0 };
     for (const e of timeline) {
       if (e.type === 'VISIT') c.visits++;
+      else if (e.type === 'EXAM') c.exams++;
       else if (e.type === 'ADMISSION') c.admissions++;
       else if (e.type === 'FORM') c.forms++;
       else if (e.type === 'DOCUMENT') c.documents++;
     }
     return c;
   }, [timeline]);
+
+  /** Locale-aware entry title: translate known kinds (incl. their visitType param), else backend title. */
+  const entryTitle = (e: TimelineEntry): string => {
+    if (!e.kind || !KNOWN_KINDS.has(e.kind)) return e.title;
+    const params: Record<string, string> = { ...(e.params ?? {}) };
+    if (params.visitType) params.visitType = t(`visitType.${params.visitType}`, { defaultValue: params.visitType });
+    return t(`patientProfile.timeline.kind.${e.kind}`, params);
+  };
 
   const visible = useMemo(
     () => (filter === 'all' ? timeline : timeline.filter((e) => e.type === FILTER_TYPE[filter])),
@@ -58,7 +73,7 @@ export function UnifiedTimeline({ timeline, renderExamFor }: {
   return (
     <div className="rounded-lg border border-ink-100 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-ink-100 bg-ink-50/40 px-4 py-3 text-xs print-hide">
-        {(['all', 'visits', 'admissions', 'forms', 'documents'] as FilterKey[]).map((key) => (
+        {(['all', 'visits', 'exams', 'admissions', 'forms', 'documents'] as FilterKey[]).map((key) => (
           <button
             key={key} type="button" data-testid={`timeline-filter-${key}`}
             onClick={() => { setFilter(key); setExpanded(null); }}
@@ -90,7 +105,7 @@ export function UnifiedTimeline({ timeline, renderExamFor }: {
                   <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', dotColor(e.department))} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                      <span className="font-medium text-ink-900">{e.title}</span>
+                      <span className="font-medium text-ink-900">{entryTitle(e)}</span>
                       <span className="text-[11px] text-ink-500">{dtt.format(new Date(e.at))}</span>
                     </div>
                     {e.detail && <div className="mt-0.5 whitespace-pre-line text-xs text-ink-600">{e.detail}</div>}
@@ -107,7 +122,7 @@ export function UnifiedTimeline({ timeline, renderExamFor }: {
                     <button
                       type="button"
                       onClick={() => {
-                        const filename = e.title.split(' — ')[0].trim();
+                        const filename = e.params?.fileName ?? e.title.split(' — ')[0].trim();
                         return setPreview({
                           fileUrl: e.refs.fileUrl!,
                           fileName: filename,

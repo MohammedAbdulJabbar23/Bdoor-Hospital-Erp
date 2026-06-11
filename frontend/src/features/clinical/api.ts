@@ -118,6 +118,10 @@ export type TimelineEntry = {
   department: string;
   title: string;
   detail: string | null;
+  /** Localization kind (visit, examFinalized, admissionOpened, …) or null for legacy entries. */
+  kind: string | null;
+  /** Interpolation params for the kind's i18n template (visitType, displayId, bed, count, fileName). */
+  params: Record<string, string> | null;
   refs: {
     visitId: string | null;
     stayId: string | null;

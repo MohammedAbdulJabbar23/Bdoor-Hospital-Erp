@@ -27,6 +27,7 @@ export function SummaryChips({ history }: { history: PatientHistory | undefined 
   );
 
   const timeline = history?.timeline ?? [];
+  const visits = timeline.filter((e) => e.type === 'VISIT').length;
   const admissions = new Set(
     timeline.filter((e) => e.type === 'ADMISSION' && e.refs.stayId).map((e) => e.refs.stayId),
   ).size;
@@ -35,7 +36,7 @@ export function SummaryChips({ history }: { history: PatientHistory | undefined 
 
   return (
     <div className="flex flex-wrap gap-2 print-hide">
-      <Chip testid="chip-visits" icon={Activity} label={t('patientProfile.timeline.chips.visits')} value={history?.totalVisits ?? 0} />
+      <Chip testid="chip-visits" icon={Activity} label={t('patientProfile.timeline.chips.visits')} value={visits} />
       <Chip testid="chip-admissions" icon={BedDouble} label={t('patientProfile.timeline.chips.admissions')} value={admissions} />
       <Chip testid="chip-documents" icon={FileText} label={t('patientProfile.timeline.chips.documents')} value={documents} />
       <Chip testid="chip-lastseen" icon={Clock} label={t('patientProfile.timeline.chips.lastSeen')} value={lastAt ? dt.format(new Date(lastAt)) : '—'} />

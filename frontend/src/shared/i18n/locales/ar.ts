@@ -1079,9 +1079,21 @@ export default {
       filters: {
         all: 'الكل',
         visits: 'الزيارات',
+        exams: 'الفحوصات',
         admissions: 'الرقود',
         forms: 'الاستمارات',
         documents: 'المستندات',
+      },
+      kind: {
+        visit: 'زيارة {{visitType}} {{displayId}}',
+        examFinalized: 'اكتمل فحص الطبيب',
+        admissionOpened: 'رقود في سرير {{bed}}',
+        admissionClosed: 'خروج من سرير {{bed}}',
+        medicalHistorySheet: 'استمارة التاريخ المرضي',
+        treatmentCharts: 'جداول العلاج — {{count}} يوم',
+        nursingLog: 'إجراءات التمريض — {{count}} مسجلة',
+        documentUploaded: 'مستند: {{fileName}}',
+        resultDocument: 'نتيجة: {{fileName}} ({{visitType}})',
       },
       chips: {
         visits: 'الزيارات',
