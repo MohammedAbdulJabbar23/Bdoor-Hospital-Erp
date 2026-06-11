@@ -220,20 +220,27 @@ class StayDocumentsIT extends IntegrationTest {
         assertThat(closedUp.getBody()).contains("STAY_CLOSED");
     }
 
-    /**
-     * Orders LAB from the stay as doctor, opens the dept case as lab (synchronous —
-     * cf. PrematureOrdersIT.driveLabChildToCompleted) and uploads result.png as lab.
-     * Returns the case attachment id.
-     */
+    record LabOrder(String visitId, String caseId, String serviceItemId, String attachmentId) {}
+
+    /** Orders LAB from the stay as doctor (waits for UNDER_CARE first); returns the forwarded visit id. */
     @SuppressWarnings("unchecked")
-    String orderLabAndUploadResult(String stay) {
+    String orderLab(String stay) {
         // payment approval flips the admission to UNDER_CARE asynchronously; orders need UNDER_CARE
         await().atMost(ofSeconds(5)).untilAsserted(() ->
                 assertThat(admissions.findById(UUID.fromString(stay)).get().getStatus())
                         .isEqualTo(AdmissionStatus.UNDER_CARE));
         var order = post("/api/premature/admissions/" + stay + "/orders",
                 Map.of("targetType", "LABORATORY"), "doctor", Map.class);
-        String forwardedVisitId = (String) order.get("visitId");
+        return (String) order.get("visitId");
+    }
+
+    /**
+     * Orders LAB from the stay as doctor, opens the dept case as lab (synchronous —
+     * cf. PrematureOrdersIT.driveLabChildToCompleted) and uploads result.png as lab.
+     */
+    @SuppressWarnings("unchecked")
+    LabOrder orderLabAndUploadResult(String stay) {
+        String forwardedVisitId = orderLab(stay);
 
         // the receiving lab opens the case on the forwarded visit (creates the DepartmentCase)
         var item = post("/api/catalogue/items", Map.of("category", "LAB", "code", "CBC-" + System.nanoTime(),
@@ -256,7 +263,32 @@ class StayDocumentsIT extends IntegrationTest {
                 "/api/dept-cases/" + deptCase.get("id") + "/services/" + item.get("id") + "/attachments",
                 HttpMethod.POST, new HttpEntity<>(form, h), Map.class);
         assertThat(up.getStatusCode().is2xxSuccessful()).as("%s", up.getBody()).isTrue();
-        return (String) up.getBody().get("id");
+        return new LabOrder(forwardedVisitId, (String) deptCase.get("id"),
+                (String) item.get("id"), (String) up.getBody().get("id"));
+    }
+
+    /**
+     * Drives the real lab findings flow (cf. PrematureOrdersIT.driveLabChildToCompleted):
+     * approve the REFERRAL payment → await AWAITING_STUDY → POST findings text.
+     */
+    @SuppressWarnings("unchecked")
+    void approveReferralAndUploadFindings(LabOrder order, String textFindings) {
+        var referral = payments.findAllByVisitIdOrderByCreatedAtDesc(UUID.fromString(order.visitId())).stream()
+                .filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst().orElseThrow();
+        post("/api/payments/" + referral.getId() + "/approve", Map.of("paymentMethod", "CASH"), "cashier", Map.class);
+        // the PaymentToCaseBridge fires AFTER_COMMIT, so wait for AWAITING_STUDY before findings
+        await().atMost(ofSeconds(5)).untilAsserted(() -> {
+            var c = rest.exchange("/api/dept-cases/" + order.caseId(), HttpMethod.GET,
+                    new HttpEntity<>(auth("lab")), Map.class);
+            assertThat(c.getBody().get("status")).isEqualTo("AWAITING_STUDY");
+        });
+        post("/api/dept-cases/" + order.caseId() + "/findings",
+                Map.of("serviceItemId", order.serviceItemId(), "textFindings", textFindings),
+                "lab", Map.class);
+    }
+
+    String resultsUrl(String stayId, String visitId) {
+        return "/api/bed-stays/PREMATURE/" + stayId + "/orders/" + visitId + "/results";
     }
 
     @Test @SuppressWarnings("unchecked")
@@ -280,9 +312,59 @@ class StayDocumentsIT extends IntegrationTest {
         // two stays; attachment belongs to stay A's order; stream via stay B's URL -> 404
         String stayA = admitUnderCare();
         String stayB = admitUnderCare();
-        String attachmentId = orderLabAndUploadResult(stayA);
+        String attachmentId = orderLabAndUploadResult(stayA).attachmentId();
         var denied = rest.exchange(docsUrl(stayB) + "/results/" + attachmentId + "/file",
                 HttpMethod.GET, new HttpEntity<>(auth("premature")), String.class);
         assertThat(denied.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void order_results_round_trip_returns_findings_and_documents() {
+        String stay = admitUnderCare();
+        LabOrder lab = orderLabAndUploadResult(stay);
+        approveReferralAndUploadFindings(lab, "WBC within normal limits");
+
+        var resp = rest.exchange(resultsUrl(stay, lab.visitId()), HttpMethod.GET,
+                new HttpEntity<>(auth("premature")), Map.class);
+        assertThat(resp.getStatusCode().is2xxSuccessful()).as("%s", resp.getBody()).isTrue();
+
+        List<Map<String, Object>> services = (List<Map<String, Object>>) resp.getBody().get("services");
+        assertThat(services).hasSize(1);
+        assertThat(services.get(0).get("serviceName")).isEqualTo("Complete Blood Count");
+        assertThat(services.get(0).get("findings")).isEqualTo("WBC within normal limits");
+
+        List<Map<String, Object>> documents = (List<Map<String, Object>>) resp.getBody().get("documents");
+        assertThat(documents).hasSize(1);
+        assertThat(documents.get(0).get("fileName")).isEqualTo("result.png");
+        assertThat(documents.get(0).get("source")).isEqualTo("LABORATORY");
+        String fileUrl = (String) documents.get(0).get("fileUrl");
+        assertThat(fileUrl).contains("/documents/results/");
+
+        // the advertised fileUrl streams the bytes on the stay-scoped route
+        var img = rest.exchange(fileUrl, HttpMethod.GET, new HttpEntity<>(auth("premature")), byte[].class);
+        assertThat(img.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(img.getBody()).isEqualTo(PNG);
+    }
+
+    @Test
+    void order_results_of_another_stay_is_404() {
+        String stayA = admitUnderCare();
+        String stayB = admitUnderCare();
+        LabOrder lab = orderLabAndUploadResult(stayA);
+        var denied = rest.exchange(resultsUrl(stayB, lab.visitId()), HttpMethod.GET,
+                new HttpEntity<>(auth("premature")), String.class);
+        assertThat(denied.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void order_results_before_dept_case_opened_is_200_with_empty_lists() {
+        String stay = admitUnderCare();
+        String visitId = orderLab(stay); // ordered, but the lab never opened the case
+
+        var resp = rest.exchange(resultsUrl(stay, visitId), HttpMethod.GET,
+                new HttpEntity<>(auth("premature")), Map.class);
+        assertThat(resp.getStatusCode().is2xxSuccessful()).as("%s", resp.getBody()).isTrue();
+        assertThat((List<Object>) resp.getBody().get("services")).isEmpty();
+        assertThat((List<Object>) resp.getBody().get("documents")).isEmpty();
     }
 }
