@@ -26,7 +26,7 @@ export type BedStayActions = {
 type BuiltinTabKey = 'overview' | 'LABORATORY' | 'RADIOLOGY' | 'ECO' | 'clinical' | 'billing' | 'timeline';
 type TabKey = BuiltinTabKey | (string & {});
 
-export type ExtraTab = { key: string; label: string; content: ReactNode };
+export type ExtraTab = { key: string; label: string; content: ReactNode; count?: number };
 
 const TARGET_ICON: Record<OrderTargetType, typeof FlaskConical> = {
   LABORATORY: FlaskConical,
@@ -107,7 +107,7 @@ export function BedStayCasePage({
     { key: 'RADIOLOGY', label: t('caseView.tabs.radiology'), count: ordersByTarget.RADIOLOGY.length },
     { key: 'ECO', label: t('caseView.tabs.eco'), count: ordersByTarget.ECO.length },
     { key: 'clinical', label: t('caseView.tabs.clinical') },
-    ...(extraTabs ?? []).map((e) => ({ key: e.key as TabKey, label: e.label })),
+    ...(extraTabs ?? []).map((e) => ({ key: e.key as TabKey, label: e.label, count: e.count })),
     { key: 'billing', label: t('caseView.tabs.billing') },
     { key: 'timeline', label: t('caseView.tabs.timeline') },
   ];

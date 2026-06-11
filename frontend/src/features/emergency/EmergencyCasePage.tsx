@@ -7,6 +7,7 @@ import type { BedStayCaseView } from '@/features/beds/case/types';
 import { MedicalHistoryTab } from '@/features/beds/case/forms/MedicalHistoryTab';
 import { NursingTab } from '@/features/beds/case/forms/NursingTab';
 import { TreatmentTab } from '@/features/beds/case/forms/TreatmentTab';
+import { DocumentsTab } from '@/features/beds/case/forms/DocumentsTab';
 import {
   getCase, listOrders, orderWorkup, setDischargeNote, finishTreatment, reissueDischargePayment,
 } from './api';
@@ -58,6 +59,8 @@ export function EmergencyCasePage() {
       content: <NursingTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
     { key: 'treatment', label: t('caseView.tabs.treatment'),
       content: <TreatmentTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
+    { key: 'documents', label: t('caseView.tabs.documents'),
+      content: <DocumentsTab department="EMERGENCY" stayId={id!} readOnly={readOnly} /> },
   ];
 
   return (
