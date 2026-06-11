@@ -1,0 +1,13 @@
+# Build outputs — the image builds from sources inside the container.
+**/target
+
+# Runtime document storage that may exist locally (never bake into images).
+data
+app/data
+
+# Editor/IDE noise
+**/.idea
+**/*.iml
+**/.vscode
+Dockerfile
+.dockerignore

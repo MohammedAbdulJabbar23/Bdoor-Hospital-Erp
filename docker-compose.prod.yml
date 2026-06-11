@@ -1,0 +1,62 @@
+# Production stack — Albudoor HMS.
+#
+#   cp .env.prod.example .env.prod   # then fill in real secrets
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# See docs/OPERATIONS.md ("Deployment") for first-time setup, upgrades and backups.
+# Volumes are deliberately named differently from the dev compose (hms-db-data)
+# so the two stacks can never collide on the same host.
+#
+# Distinct project name: without it, both compose files default to the directory
+# name ("javafreelance") and `down` on one stack tears down the other's
+# containers/network.
+name: hms-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hms-prod-db
+    environment:
+      POSTGRES_DB: hms
+      POSTGRES_USER: hms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+    # No published port: the database is reachable only from the compose network.
+    volumes:
+      - hms-prod-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hms -d hms"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: hms-prod-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/hms
+      SPRING_DATASOURCE_USERNAME: hms
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      HMS_JWT_SECRET: ${HMS_JWT_SECRET:?set HMS_JWT_SECRET in .env.prod}
+      HMS_ADMIN_INITIAL_PASSWORD: ${HMS_ADMIN_INITIAL_PASSWORD:-}
+      HMS_ATTACHMENTS_DIR: /var/hms/attachments
+    volumes:
+      - hms-prod-attachments:/var/hms/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: hms-prod-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  hms-prod-db:
+  hms-prod-attachments:

@@ -36,3 +36,80 @@ an I/O error mid-read), and `orphanedFiles` (files on disk that no DB row refere
 system returns empty `missing`, `corrupt`, and `unreadable` lists; `orphanedFiles`, however, can
 legitimately contain superseded signature images — re-signing overwrites the reference without
 deleting the old blob — so treat orphans as a cleanup candidate list, not as corruption.
+
+## Deployment
+
+The repository ships a self-contained production stack: `docker-compose.prod.yml` at the repo
+root builds and runs three services — `db` (postgres:16-alpine, named volume `hms-prod-db`),
+`backend` (multi-stage build from `backend/Dockerfile`, prod Spring profile, attachments on
+named volume `hms-prod-attachments` mounted at `/var/hms/attachments`) and `frontend`
+(nginx serving the built SPA on port 80, proxying `/api/` to the backend). The volume names
+are deliberately distinct from the dev compose's `hms-db-data`, so dev and prod stacks never
+share data even on the same machine.
+
+### Prerequisites
+
+- Docker Engine + the compose plugin (`docker compose version` works).
+- Port 80 free on the host.
+- Outbound network access during the first build (Maven Central, npm, Docker Hub).
+
+### First-time setup
+
+    cp .env.prod.example .env.prod
+    # edit .env.prod:
+    #   POSTGRES_PASSWORD          — strong DB password
+    #   HMS_JWT_SECRET             — openssl rand -base64 48
+    #   HMS_ADMIN_INITIAL_PASSWORD — initial password for the bootstrap "admin" user
+    docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+On first boot Flyway creates the schema and `ProdAdminBootstrap` (prod profile only) creates a
+single active ADMIN user, username `admin`, with `HMS_ADMIN_INITIAL_PASSWORD`. The demo seeder
+(`DevDataSeeder`) is disabled under the prod profile — no demo users or catalogue data exist.
+
+**Log in and change the admin password immediately.** The bootstrap password sits in plain
+text in `.env.prod`; once any user exists the bootstrap never runs again, so after changing
+the password you can (and should) blank `HMS_ADMIN_INITIAL_PASSWORD` in `.env.prod`. Never
+commit `.env.prod` — it is gitignored; only `.env.prod.example` (placeholders) is tracked.
+
+If the users table is empty and `HMS_ADMIN_INITIAL_PASSWORD` is unset, the backend refuses to
+start (fail fast) — a production system with zero users and no way to log in is a
+misconfiguration.
+
+### Upgrades
+
+    git pull
+    docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+Flyway applies any new migrations on boot; data in the named volumes is untouched. Roll out
+during a quiet window — the backend restarts and in-flight sessions get logged out.
+
+### Backups
+
+Back up the database and the attachments volume **together, from the same point in time**
+(see "Document storage" above for why one without the other is useless):
+
+    docker exec hms-prod-db pg_dump -U hms hms | gzip > hms-db-$(date +%F).sql.gz
+    docker run --rm -v hms-prod-attachments:/data -v "$PWD":/backup alpine \
+        tar czf /backup/hms-attachments-$(date +%F).tar.gz -C /data .
+
+(Compose may prefix the volume name with the project directory name — check
+`docker volume ls` for the exact `…hms-prod-attachments` name.) Restore order: load the SQL
+dump into a fresh `db` volume, untar the attachments into the attachments volume, start the
+backend, then run `POST /api/admin/storage/verify` to confirm zero missing/corrupt blobs.
+
+### Migrating attachments from an existing (non-Docker) install
+
+If you are moving onto this stack from a host-run backend, consolidate any legacy attachment
+roots first (`ops/consolidate-attachments.sh`, see "Document storage"), then copy the canonical
+directory into the volume once:
+
+    docker run --rm -v hms-prod-attachments:/data -v /var/lib/hms/attachments:/src:ro alpine \
+        sh -c 'cp -a /src/. /data/'
+
+This is a one-time step; afterwards the volume is the single source of truth.
+
+### TLS
+
+The stack serves plain HTTP on port 80. Terminate TLS at the hospital's existing reverse
+proxy / load balancer in front of the `frontend` container, or extend `frontend/nginx.conf`
+with a certificate — hospital network specifics are out of scope here.

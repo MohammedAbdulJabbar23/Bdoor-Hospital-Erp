@@ -57,6 +57,9 @@ springdoc:
     path: /swagger-ui.html
 
 hms:
+  admin:
+    # Consumed once by ProdAdminBootstrap (prod profile) when the users table is empty.
+    initial-password: ${HMS_ADMIN_INITIAL_PASSWORD:}
   attachments:
     dir: ${HMS_ATTACHMENTS_DIR:data/attachments}
   patient:
