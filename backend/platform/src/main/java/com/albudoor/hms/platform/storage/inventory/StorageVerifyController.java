@@ -5,8 +5,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
-
 @RestController
 @RequestMapping("/api/admin/storage")
 public class StorageVerifyController {
@@ -19,7 +17,7 @@ public class StorageVerifyController {
 
     @PostMapping("/verify")
     @PreAuthorize("hasRole('ADMIN')")
-    public StorageVerifyResponse verify() throws IOException {
+    public StorageVerifyResponse verify() {
         return handler.verify();
     }
 }

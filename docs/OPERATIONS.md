@@ -31,5 +31,8 @@ After any consolidation, restore, or disk incident — and periodically as routi
 call `POST /api/admin/storage/verify` (ADMIN role). It walks every DB-referenced blob across
 all modules and returns: `checked` (total references), `missing` (DB rows whose file is gone),
 `corrupt` (files whose SHA-256 no longer matches the recorded hash, where one was recorded),
-and `orphanedFiles` (files on disk that no DB row references). A healthy system returns empty
-lists for all three.
+`unreadable` (references whose blob could not be opened or hashed, e.g. a null storage key or
+an I/O error mid-read), and `orphanedFiles` (files on disk that no DB row references). A healthy
+system returns empty `missing`, `corrupt`, and `unreadable` lists; `orphanedFiles`, however, can
+legitimately contain superseded signature images — re-signing overwrites the reference without
+deleting the old blob — so treat orphans as a cleanup candidate list, not as corruption.

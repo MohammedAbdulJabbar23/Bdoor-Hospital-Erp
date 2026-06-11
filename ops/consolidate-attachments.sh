@@ -14,7 +14,16 @@ for legacy in ${LEGACY[@]}; do
   (cd "$legacy" && find . -type f -print0) | while IFS= read -r -d '' f; do
     dest="$CANONICAL/${f#./}"
     mkdir -p "$(dirname "$dest")"
-    if [ -e "$dest" ]; then echo "SKIP (exists): $f"; else mv "$legacy/$f" "$dest"; fi
+    if [ -e "$dest" ]; then
+      if cmp -s "$legacy/$f" "$dest"; then
+        echo "SKIP (identical): $f"
+      else
+        echo "ERROR: $dest exists but differs from $legacy/$f — resolve manually before re-running" >&2
+        exit 1
+      fi
+    else
+      mv "$legacy/$f" "$dest"
+    fi
   done
 done
 echo "Done. Verify with POST /api/admin/storage/verify (ADMIN)."

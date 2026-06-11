@@ -103,6 +103,7 @@ class StorageVerifyIT extends IntegrationTest {
         assertThat(((Number) body.get("checked")).intValue()).isGreaterThanOrEqualTo(1);
         List<Map<String, Object>> missing = (List<Map<String, Object>>) body.get("missing");
         assertThat(missing).anySatisfy(m -> assertThat(m.get("storageKey")).isEqualTo(storageKeyOfDeleted));
+        assertThat(body).containsKey("unreadable");
     }
 
     @Test

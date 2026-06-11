@@ -2,12 +2,15 @@ package com.albudoor.hms.platform.storage.inventory;
 
 import com.albudoor.hms.platform.exception.StorageMissingException;
 import com.albudoor.hms.platform.storage.FileStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.DigestInputStream;
@@ -22,6 +25,8 @@ import java.util.stream.Stream;
 @Service
 public class StorageVerifyHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(StorageVerifyHandler.class);
+
     private final List<DocumentInventoryContributor> contributors;
     private final FileStorage storage;
     private final Path root;
@@ -33,14 +38,27 @@ public class StorageVerifyHandler {
         this.root = Path.of(dir).toAbsolutePath().normalize();
     }
 
-    public StorageVerifyResponse verify() throws IOException {
+    public StorageVerifyResponse verify() {
         List<DocumentRef> missing = new ArrayList<>();
         List<DocumentRef> corrupt = new ArrayList<>();
+        List<DocumentRef> unreadable = new ArrayList<>();
         Set<String> referenced = new HashSet<>();
         int checked = 0;
         for (DocumentInventoryContributor c : contributors) {
-            for (DocumentRef ref : c.documentRefs()) {
+            List<DocumentRef> refs;
+            try {
+                refs = c.documentRefs();
+            } catch (RuntimeException e) {
+                log.error("Storage verify: contributor {} failed to enumerate document refs; skipping it",
+                        c.getClass().getName(), e);
+                continue;
+            }
+            for (DocumentRef ref : refs) {
                 checked++;
+                if (ref.storageKey() == null) {
+                    unreadable.add(ref);
+                    continue;
+                }
                 referenced.add(ref.storageKey());
                 try (InputStream in = storage.open(ref.storageKey())) {
                     if (ref.sha256() != null) {
@@ -57,6 +75,9 @@ public class StorageVerifyHandler {
                     }
                 } catch (StorageMissingException e) {
                     missing.add(ref);
+                } catch (IOException | UncheckedIOException e) {
+                    log.error("Storage verify: failed to read {} ({}/{})", ref.storageKey(), ref.owner(), ref.refId(), e);
+                    unreadable.add(ref);
                 }
             }
         }
@@ -67,8 +88,10 @@ public class StorageVerifyHandler {
                         .map(p -> root.relativize(p).toString().replace('\\', '/'))
                         .filter(k -> !referenced.contains(k))
                         .forEach(orphaned::add);
+            } catch (IOException | UncheckedIOException e) {
+                log.error("Storage verify: orphan scan of {} failed; orphanedFiles list may be incomplete", root, e);
             }
         }
-        return new StorageVerifyResponse(checked, missing, corrupt, orphaned);
+        return new StorageVerifyResponse(checked, missing, corrupt, unreadable, orphaned);
     }
 }
