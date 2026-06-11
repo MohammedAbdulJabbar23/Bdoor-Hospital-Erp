@@ -109,10 +109,28 @@ export type HistoryEntry = {
   exam: DoctorExam | null;
 };
 
+export type HistoryEntryType = 'VISIT' | 'ADMISSION' | 'EXAM' | 'FORM' | 'DOCUMENT' | 'ORDER';
+
+export type TimelineEntry = {
+  at: string;
+  type: HistoryEntryType;
+  /** VisitType name (PREMATURE, EMERGENCY, LABORATORY, …) or 'CLINICAL'. */
+  department: string;
+  title: string;
+  detail: string | null;
+  refs: {
+    visitId: string | null;
+    stayId: string | null;
+    documentId: string | null;
+    fileUrl: string | null;
+  };
+};
+
 export type PatientHistory = {
   patientId: string;
   totalVisits: number;
   entries: HistoryEntry[];
+  timeline: TimelineEntry[];
 };
 
 export async function getPatientHistory(patientId: string): Promise<PatientHistory> {

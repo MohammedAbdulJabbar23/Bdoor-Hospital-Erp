@@ -1066,6 +1066,23 @@ export default {
     patientArchived: 'Patient archived',
     patientUnarchived: 'Patient un-archived',
     archiveFailed: 'Archive failed',
+    timeline: {
+      filters: {
+        all: 'All',
+        visits: 'Visits',
+        admissions: 'Admissions',
+        forms: 'Forms',
+        documents: 'Documents',
+      },
+      chips: {
+        visits: 'Visits',
+        admissions: 'Admissions',
+        documents: 'Documents',
+        lastSeen: 'Last seen',
+      },
+      empty: 'Nothing here yet',
+      view: 'View',
+    },
     typeLabel: {
       DOCTOR_APPOINTMENT: 'Doctor',
       LABORATORY: 'Lab',

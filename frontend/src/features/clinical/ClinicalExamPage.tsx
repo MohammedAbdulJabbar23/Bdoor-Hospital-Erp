@@ -157,7 +157,7 @@ export function ClinicalExamPage() {
   });
   // History-shaped view used by the existing derive helpers (problem list, meds, vitals trend).
   const history = useMemo(
-    () => record ? { patientId: record.patientId, totalVisits: record.totalVisits, entries: record.visits } : undefined,
+    () => record ? { patientId: record.patientId, totalVisits: record.totalVisits, entries: record.visits, timeline: [] } : undefined,
     [record],
   );
   // Detailed clinical data for the dedicated Lab / Radiology / Medications tabs (across all visits).

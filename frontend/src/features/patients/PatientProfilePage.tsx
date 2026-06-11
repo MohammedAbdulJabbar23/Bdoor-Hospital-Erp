@@ -7,9 +7,8 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft, Activity, Pill, ClipboardList,
   Stethoscope, FlaskConical, Scan, HeartPulse, Siren, Baby,
-  TrendingUp, ChevronRight, Crown, Phone, MapPin, IdCard,
-  Calendar, FileText, Search, Printer, X as XIcon,
-  Inbox,
+  TrendingUp, ChevronRight, Crown,
+  FileText, Printer, X as XIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { Card } from '@/shared/ui/Card';
@@ -24,14 +23,15 @@ import { createVisit, VisitType } from '@/features/reception/visits/api';
 import { useNavigate } from 'react-router-dom';
 import { Archive } from 'lucide-react';
 import {
-  getPatientHistory, PatientHistory, HistoryEntry, Vitals,
+  getPatientHistory, HistoryEntry, Vitals,
 } from '@/features/clinical/api';
 import {
   deriveActiveMedications, deriveProblemList, deriveVitalsTrend, deriveRecentResults,
 } from '@/features/clinical/derive';
 import { cn } from '@/shared/ui/cn';
-
-type VisitTypeFilter = 'ALL' | 'DOCTOR_APPOINTMENT' | 'LABORATORY' | 'RADIOLOGY' | 'ECO' | 'EMERGENCY' | 'PREMATURE';
+import { ProfileHeader } from '@/features/patients/history/ProfileHeader';
+import { SummaryChips } from '@/features/patients/history/SummaryChips';
+import { UnifiedTimeline } from '@/features/patients/history/UnifiedTimeline';
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   DOCTOR_APPOINTMENT: Stethoscope,
@@ -138,8 +138,6 @@ export function PatientProfilePage() {
     );
   }
 
-  const age = computeAge(patient.dateOfBirth);
-
   return (
     <div className="space-y-4">
       <div className="print-hide flex items-center justify-between">
@@ -222,46 +220,9 @@ export function PatientProfilePage() {
       </div>
 
       {/* ----- HEADER STRIP ----- */}
-      <Card>
-        <div className="flex flex-wrap items-start justify-between gap-4 p-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700 text-lg font-semibold">
-              {initials(patient.fullName)}
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{patient.fullName}</h1>
-                {patient.vip && <Badge tone="brand"><Crown size={11} className="me-0.5" />VIP</Badge>}
-                {patient.archived && <Badge tone="neutral">{t('patientProfile.archived')}</Badge>}
-                <Badge tone={patient.type === 'INFANT' ? 'warning' : 'info'}>{patient.type === 'INFANT' ? t('patientProfile.infant') : t('patientProfile.adult')}</Badge>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <KV icon={IdCard} label={t('patientProfile.mrn')}><span className="font-mono">{patient.mrn}</span></KV>
-                <KV label={t('patientProfile.gender')}>{patient.gender === 'MALE' ? t('patientProfile.male') : t('patientProfile.female')}</KV>
-                <KV icon={Calendar} label={t('patientProfile.dob')}>{dt.format(new Date(patient.dateOfBirth))} <span className="text-ink-500">· {age}</span></KV>
-                {patient.adult?.mobileNumber && <KV icon={Phone} label={t('patientProfile.mobile')}><span className="font-mono">{patient.adult.mobileNumber}</span></KV>}
-                {patient.adult?.nationalId && <KV label={t('patientProfile.nationalId')}><span className="font-mono">{patient.adult.nationalId}</span></KV>}
-              </div>
-              {patient.adult?.address && (
-                <div className="mt-1 inline-flex items-center gap-1 text-xs text-ink-500">
-                  <MapPin size={12} /> {patient.adult.address}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2 text-end">
-            <div className="text-2xl font-semibold text-ink-900">{history?.totalVisits ?? 0}</div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-500">{t('patientProfile.totalVisits')}</div>
-          </div>
-        </div>
-        {patient.adult?.emergencyContactName && (
-          <div className="border-t border-ink-100 px-5 py-3 text-xs">
-            <span className="font-semibold uppercase tracking-wide text-ink-500">{t('patientProfile.emergencyContact')}</span>
-            <span className="ms-2 text-ink-700">{patient.adult.emergencyContactName}</span>
-            {patient.adult.emergencyContactMobile && <span className="ms-2 font-mono text-ink-500">{patient.adult.emergencyContactMobile}</span>}
-          </div>
-        )}
-      </Card>
+      <ProfileHeader patient={patient} />
+
+      <SummaryChips history={history} />
 
       {/* ----- SUMMARY GRID ----- */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -282,11 +243,20 @@ export function PatientProfilePage() {
         />
       </div>
 
-      {/* ----- TWO-COL: visits left, snapshot right ----- */}
+      {/* ----- TWO-COL: timeline left, snapshot right ----- */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_400px]">
-        <VisitsTimelineCard
-          history={history} loading={historyLoading} dt={dt} dtt={dtt}
-        />
+        {historyLoading ? (
+          <div className="space-y-2"><Skeleton className="h-10" />{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+        ) : (
+          <UnifiedTimeline
+            timeline={history?.timeline ?? []}
+            renderExamFor={(visitId) => {
+              const entry = history?.entries.find((e) => e.visitId === visitId);
+              if (!entry) return null;
+              return <VisitExamDetail entry={entry} dtt={dtt} />;
+            }}
+          />
+        )}
 
         <div className="space-y-4">
           {activeOrders.length > 0 && (
@@ -304,190 +274,34 @@ export function PatientProfilePage() {
   );
 }
 
-/* ============================================================== Visits timeline ============================================================== */
+/* ============================================================== Visit exam detail (timeline expansion) ============================================================== */
 
-function VisitsTimelineCard({
-  history, loading, dt, dtt,
-}: {
-  history: PatientHistory | undefined;
-  loading: boolean;
-  dt: Intl.DateTimeFormat;
-  dtt: Intl.DateTimeFormat;
-}) {
+function VisitExamDetail({ entry, dtt }: { entry: HistoryEntry; dtt: Intl.DateTimeFormat }) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<VisitTypeFilter>('ALL');
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-
-  const entries = useMemo(() => {
-    if (!history) return [];
-    let list = history.entries;
-    if (filter !== 'ALL') list = list.filter((e) => e.visitType === filter);
-    if (query.trim()) list = list.filter((e) => entryMatches(e, query));
-    return list;
-  }, [history, filter, query]);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 print-hide">
-        <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-            <Calendar size={14} className="text-brand-600" /> {t('patientProfile.visitTimeline')}
-          </h3>
-          <p className="text-xs text-ink-500">{t('patientProfile.visitTimelineHint')}</p>
-        </div>
-      </div>
-
-      <div className="space-y-3 border-b border-ink-100 bg-ink-50/40 px-5 py-3 print-hide">
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('patientProfile.searchPlaceholder')}
-            className="h-9 w-full rounded-lg border border-ink-200 bg-white ps-9 pe-8 text-sm placeholder:text-ink-400 focus:border-brand-500"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              className="absolute end-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-              aria-label={t('patientProfile.clearSearch')}
-            >
-              <XIcon size={12} />
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-medium text-ink-600">{t('patientProfile.filter')}</span>
-          {(['ALL', 'DOCTOR_APPOINTMENT', 'LABORATORY', 'RADIOLOGY', 'ECO', 'EMERGENCY', 'PREMATURE'] as VisitTypeFilter[]).map((f) => (
-            <button
-              key={f} type="button" onClick={() => setFilter(f)}
-              className={cn(
-                'inline-flex h-7 items-center rounded-full px-3 font-medium transition-colors',
-                filter === f ? 'bg-brand-600 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-50'
-              )}
-            >
-              {f === 'ALL' ? t('common.all') : typeLabel(t, f)}
-            </button>
-          ))}
-          {(query || filter !== 'ALL') && (
-            <span className="ms-auto text-ink-500">
-              {t('patientProfile.resultCount', { count: entries.length })}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
-      ) : entries.length === 0 ? (
-        <div className="px-5 py-10 text-center">
-          <Inbox size={28} className="mx-auto text-ink-300" />
-          <p className="mt-2 text-sm text-ink-600">
-            {history?.entries.length === 0 ? t('patientProfile.noVisits') :
-              query ? t('patientProfile.noVisitsMatchQuery', { query }) : t('patientProfile.noVisitsMatchFilter')}
-          </p>
-          {(query || filter !== 'ALL') && (
-            <button type="button" onClick={() => { setQuery(''); setFilter('ALL'); }} className="mt-2 text-xs font-medium text-brand-700 hover:underline">
-              {t('patientProfile.clearFilters')}
-            </button>
-          )}
-        </div>
-      ) : (
-        <ol className="relative ms-5 border-s border-ink-200">
-          {entries.map((e) => (
-            <TimelineRow
-              key={e.visitId} entry={e}
-              expanded={expanded === e.visitId}
-              onToggle={() => setExpanded((v) => v === e.visitId ? null : e.visitId)}
-              dt={dt} dtt={dtt}
-            />
-          ))}
-        </ol>
-      )}
-    </Card>
-  );
-}
-
-function TimelineRow({
-  entry, expanded, onToggle, dt, dtt,
-}: {
-  entry: HistoryEntry;
-  expanded: boolean;
-  onToggle: () => void;
-  dt: Intl.DateTimeFormat;
-  dtt: Intl.DateTimeFormat;
-}) {
-  const { t } = useTranslation();
-  const Icon = TYPE_ICON[entry.visitType] ?? Calendar;
-  const tone = statusTone(entry.status);
   const hasExam = entry.exam != null;
-
   return (
-    <li className="relative ms-2 py-3 ps-6">
-      <span className="absolute -start-[7px] top-5 flex h-3 w-3 items-center justify-center rounded-full bg-brand-600 ring-4 ring-white" />
-      <button
-        type="button" onClick={onToggle}
-        className="block w-full rounded-lg px-3 py-2 text-start hover:bg-ink-50"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm">
-              <Icon size={14} className="text-ink-500" />
-              <span className="font-medium text-ink-900">{typeLabel(t, entry.visitType)}</span>
-              {entry.parentVisitId && (
-                <Badge tone="warning">{t('patientProfile.forwarded')}</Badge>
-              )}
-              <Badge tone={tone}>{entry.status.replace(/_/g, ' ')}</Badge>
-            </div>
-            <div className="mt-0.5 font-mono text-[11px] text-ink-500">{entry.visitDisplayId}</div>
-            {hasExam && entry.exam!.diagnoses.length > 0 && (
-              <div className="mt-1 truncate text-xs text-ink-700">
-                <span className="font-semibold">{t('patientProfile.dx')}</span>{' '}
-                {entry.exam!.diagnoses.find((d) => d.primary)?.description ?? entry.exam!.diagnoses[0].description}
-                {entry.exam!.diagnoses.length > 1 && <span className="ms-1 text-ink-500">+{entry.exam!.diagnoses.length - 1}</span>}
-              </div>
-            )}
-            {!hasExam && entry.resultsSummary && (
-              <div className="mt-1 truncate text-xs text-ink-600">{entry.resultsSummary.split('\n')[0]}</div>
-            )}
-          </div>
-          <div className="text-end">
-            <div className="text-xs text-ink-700">{dt.format(new Date(entry.startedAt))}</div>
-            {hasExam && entry.exam!.doctorName && (
-              <div className="text-[11px] text-ink-500">{entry.exam!.doctorName}</div>
-            )}
-          </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs">
+          <span className="text-ink-500">{t('patientProfile.started')}</span>{' '}
+          <span className="font-mono">{dtt.format(new Date(entry.startedAt))}</span>
+          {entry.endedAt && <>{' · '}<span className="text-ink-500">{t('patientProfile.ended')}</span> <span className="font-mono">{dtt.format(new Date(entry.endedAt))}</span></>}
         </div>
-      </button>
+        <Link to={`/clinical/exam/${entry.visitId}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
+          {t('patientProfile.openExam')} <ChevronRight size={12} className="rtl:rotate-180" />
+        </Link>
+      </div>
 
-      {expanded && (
-        <div className="ms-3 mt-2 space-y-3 rounded-lg border border-ink-200 bg-white p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs">
-              <span className="text-ink-500">{t('patientProfile.started')}</span>{' '}
-              <span className="font-mono">{dtt.format(new Date(entry.startedAt))}</span>
-              {entry.endedAt && <>{' · '}<span className="text-ink-500">{t('patientProfile.ended')}</span> <span className="font-mono">{dtt.format(new Date(entry.endedAt))}</span></>}
-            </div>
-            <Link to={`/clinical/exam/${entry.visitId}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
-              {t('patientProfile.openExam')} <ChevronRight size={12} className="rtl:rotate-180" />
-            </Link>
-          </div>
-
-          {hasExam && (
-            <ExamDetailsBlock exam={entry.exam!} />
-          )}
-          {!hasExam && entry.resultsSummary && (
-            <div className="rounded bg-ink-50 p-2 font-mono text-[11px] whitespace-pre-line text-ink-700">{entry.resultsSummary}</div>
-          )}
-          {!hasExam && !entry.resultsSummary && (
-            <p className="text-xs text-ink-500">{t('patientProfile.noDetail')}</p>
-          )}
-        </div>
+      {hasExam && (
+        <ExamDetailsBlock exam={entry.exam!} />
       )}
-    </li>
+      {!hasExam && entry.resultsSummary && (
+        <div className="rounded bg-ink-50 p-2 font-mono text-[11px] whitespace-pre-line text-ink-700">{entry.resultsSummary}</div>
+      )}
+      {!hasExam && !entry.resultsSummary && (
+        <p className="text-xs text-ink-500">{t('patientProfile.noDetail')}</p>
+      )}
+    </div>
   );
 }
 
@@ -823,23 +637,6 @@ function bmiTone(b: number | null): 'normal' | 'warn' | 'critical' | undefined {
   return 'normal';
 }
 
-function entryMatches(e: HistoryEntry, q: string): boolean {
-  const needle = q.toLowerCase();
-  if (e.visitDisplayId.toLowerCase().includes(needle)) return true;
-  if (e.visitType.toLowerCase().includes(needle)) return true;
-  if (e.resultsSummary && e.resultsSummary.toLowerCase().includes(needle)) return true;
-  if (e.exam) {
-    if (e.exam.doctorName.toLowerCase().includes(needle)) return true;
-    if (e.exam.chiefComplaint?.toLowerCase().includes(needle)) return true;
-    if (e.exam.historyOfPresentIllness?.toLowerCase().includes(needle)) return true;
-    if (e.exam.examinationNotes?.toLowerCase().includes(needle)) return true;
-    if (e.exam.plan?.toLowerCase().includes(needle)) return true;
-    if (e.exam.diagnoses.some((d) => d.description.toLowerCase().includes(needle) || (d.code ?? '').toLowerCase().includes(needle))) return true;
-    if (e.exam.prescriptions.some((p) => p.drugName.toLowerCase().includes(needle))) return true;
-  }
-  return false;
-}
-
 function RecentResultsCard({ results, dt }: { results: ReturnType<typeof deriveRecentResults>; dt: Intl.DateTimeFormat }) {
   const { t } = useTranslation();
   return (
@@ -907,16 +704,6 @@ function SummaryTile({
   );
 }
 
-function KV({ icon: Icon, label, children }: { icon?: LucideIcon; label: string; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5 text-xs">
-      {Icon && <Icon size={12} className="text-ink-400" />}
-      <span className="text-ink-500">{label}:</span>
-      <span className="font-medium text-ink-700">{children}</span>
-    </span>
-  );
-}
-
 function statusTone(s: string): 'neutral' | 'info' | 'success' | 'warning' | 'brand' | 'danger' {
   switch (s) {
     case 'COMPLETED': case 'RETURNED': return 'success';
@@ -931,26 +718,6 @@ function statusTone(s: string): 'neutral' | 'info' | 'success' | 'warning' | 'br
 function hasAnyVital(v: Vitals) {
   return v.systolicBp != null || v.heartRate != null || v.temperatureC != null
       || v.weightKg != null || v.heightCm != null || v.oxygenSaturation != null;
-}
-
-function initials(name: string) {
-  const p = name.trim().split(/\s+/).filter(Boolean);
-  if (p.length === 0) return '?';
-  if (p.length === 1) return p[0][0].toUpperCase();
-  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
-}
-
-function computeAge(dob: string): string {
-  const birth = new Date(dob);
-  const now = new Date();
-  let years = now.getFullYear() - birth.getFullYear();
-  const m = now.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) years--;
-  if (years < 1) {
-    const months = (now.getFullYear() - birth.getFullYear()) * 12 + m;
-    return `${months}mo`;
-  }
-  return `${years}y`;
 }
 
 function relativeDate(iso: string, t: TFunction): string {

@@ -1066,6 +1066,23 @@ export default {
     patientArchived: 'تمت أرشفة المريض',
     patientUnarchived: 'تم إلغاء أرشفة المريض',
     archiveFailed: 'فشلت الأرشفة',
+    timeline: {
+      filters: {
+        all: 'الكل',
+        visits: 'الزيارات',
+        admissions: 'الرقود',
+        forms: 'الاستمارات',
+        documents: 'المستندات',
+      },
+      chips: {
+        visits: 'الزيارات',
+        admissions: 'الرقود',
+        documents: 'المستندات',
+        lastSeen: 'آخر زيارة',
+      },
+      empty: 'لا يوجد شيء بعد',
+      view: 'عرض',
+    },
     typeLabel: {
       DOCTOR_APPOINTMENT: 'طبيب',
       LABORATORY: 'مختبر',
