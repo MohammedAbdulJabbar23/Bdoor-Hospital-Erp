@@ -92,8 +92,8 @@ Back up the database and the attachments volume **together, from the same point 
     docker run --rm -v hms-prod-attachments:/data -v "$PWD":/backup alpine \
         tar czf /backup/hms-attachments-$(date +%F).tar.gz -C /data .
 
-(Compose may prefix the volume name with the project directory name — check
-`docker volume ls` for the exact `…hms-prod-attachments` name.) Restore order: load the SQL
+(The compose file pins the volume names explicitly, so `hms-prod-db` and
+`hms-prod-attachments` are the exact names — no project prefix.) Restore order: load the SQL
 dump into a fresh `db` volume, untar the attachments into the attachments volume, start the
 backend, then run `POST /api/admin/storage/verify` to confirm zero missing/corrupt blobs.
 

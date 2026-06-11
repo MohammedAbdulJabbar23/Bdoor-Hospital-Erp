@@ -46,6 +46,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # The JRE image ships neither curl nor wget; probe /actuator/health (permitAll,
+    # exposed in the prod profile) with bash's built-in /dev/tcp instead.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080 && echo -e \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q \"200\" <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
 
   frontend:
@@ -54,9 +62,15 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
+# Explicit `name:` pins the real Docker volume names so the backup/restore commands
+# in docs/OPERATIONS.md work as written (compose would otherwise prefix them with
+# the project name, e.g. hms-prod_hms-prod-db).
 volumes:
   hms-prod-db:
+    name: hms-prod-db
   hms-prod-attachments:
+    name: hms-prod-attachments
