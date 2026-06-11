@@ -4,6 +4,7 @@ import com.albudoor.hms.bedstayforms.directory.AgeText;
 import com.albudoor.hms.bedstayforms.directory.StayDirectory;
 import com.albudoor.hms.bedstayforms.directory.StayInfo;
 import com.albudoor.hms.bedstayforms.directory.StayOrderRef;
+import com.albudoor.hms.bedstayforms.directory.StayRef;
 import com.albudoor.hms.bedstayforms.domain.StayDepartment;
 import com.albudoor.hms.patientregistry.infrastructure.PatientRepository;
 import com.albudoor.hms.premature.domain.AdmissionStatus;
@@ -58,5 +59,16 @@ public class PrematureStayDirectory implements StayDirectory {
                         .map(v -> new StayOrderRef(v.getId(), v.getVisitType().name(), v.getStartedAt()))
                         .toList())
                 .orElse(List.of());
+    }
+
+    @Override
+    public Optional<StayRef> stayForOrderVisit(UUID childVisitId) {
+        return visits.findById(childVisitId)
+                .filter(v -> v.getParentVisitId() != null)
+                .filter(v -> v.getVisitType() == VisitType.LABORATORY
+                        || v.getVisitType() == VisitType.RADIOLOGY
+                        || v.getVisitType() == VisitType.ECO)
+                .flatMap(v -> admissions.findByVisitId(v.getParentVisitId()))
+                .map(a -> new StayRef(StayDepartment.PREMATURE, a.getId()));
     }
 }

@@ -1,5 +1,7 @@
 package com.albudoor.hms.bedstayforms.history;
 
+import com.albudoor.hms.bedstayforms.directory.StayDirectory;
+import com.albudoor.hms.bedstayforms.directory.StayRef;
 import com.albudoor.hms.bedstayforms.infrastructure.StayDocumentRepository;
 import com.albudoor.hms.clinicalcase.history.HistoryContributor;
 import com.albudoor.hms.clinicalcase.history.HistoryEntry;
@@ -11,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -24,13 +28,16 @@ public class BedStayFormsHistoryContributor implements HistoryContributor {
     private final StayDocumentRepository documents;
     private final DepartmentCaseRepository deptCases;
     private final CaseAttachmentRepository caseAttachments;
+    private final List<StayDirectory> stayDirectories;
 
     public BedStayFormsHistoryContributor(StayDocumentRepository documents,
                                           DepartmentCaseRepository deptCases,
-                                          CaseAttachmentRepository caseAttachments) {
+                                          CaseAttachmentRepository caseAttachments,
+                                          List<StayDirectory> stayDirectories) {
         this.documents = documents;
         this.deptCases = deptCases;
         this.caseAttachments = caseAttachments;
+        this.stayDirectories = stayDirectories;
     }
 
     @Override
@@ -40,16 +47,28 @@ public class BedStayFormsHistoryContributor implements HistoryContributor {
                 out.add(new HistoryEntry(d.getCreatedAt(), HistoryEntryType.DOCUMENT, d.getDepartment().name(),
                         d.getFileName() + (d.getLabel() != null ? " — " + d.getLabel() : ""),
                         d.isArchived() ? "archived" : null,
+                        "documentUploaded", Map.of("fileName", d.getFileName()),
                         HistoryRefs.document(d.getId(),
                                 "/api/bed-stays/" + d.getDepartment() + "/" + d.getStayId()
                                         + "/documents/" + d.getId() + "/file"))));
-        deptCases.findAllByPatientIdOrderByCreatedAtDesc(patientId).forEach(c ->
-                caseAttachments.findAllByCaseIdOrderByUploadedAtAsc(c.getId()).forEach(a ->
-                        out.add(new HistoryEntry(a.getUploadedAt(), HistoryEntryType.DOCUMENT,
-                                c.getCategory().visitType().name(),
-                                a.getFileName(), "Result document",
-                                HistoryRefs.document(a.getId(),
-                                        "/api/dept-cases/attachments/" + a.getId() + "/file")))));
+        deptCases.findAllByPatientIdOrderByCreatedAtDesc(patientId).forEach(c -> {
+            String visitType = c.getCategory().visitType().name();
+            // role-correct URL: serve the result on the bed-stay route when the order came from a stay
+            Optional<StayRef> stay = stayDirectories.stream()
+                    .map(d -> d.stayForOrderVisit(c.getVisitId()))
+                    .flatMap(Optional::stream)
+                    .findFirst();
+            caseAttachments.findAllByCaseIdOrderByUploadedAtAsc(c.getId()).forEach(a -> {
+                String fileUrl = stay
+                        .map(s -> "/api/bed-stays/" + s.department() + "/" + s.stayId()
+                                + "/documents/results/" + a.getId() + "/file")
+                        .orElse("/api/dept-cases/attachments/" + a.getId() + "/file");
+                out.add(new HistoryEntry(a.getUploadedAt(), HistoryEntryType.DOCUMENT, visitType,
+                        a.getFileName(), "Result document",
+                        "resultDocument", Map.of("fileName", a.getFileName(), "visitType", visitType),
+                        HistoryRefs.document(a.getId(), fileUrl)));
+            });
+        });
         return out;
     }
 }

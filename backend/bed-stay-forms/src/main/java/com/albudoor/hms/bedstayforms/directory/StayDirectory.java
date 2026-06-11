@@ -16,4 +16,10 @@ public interface StayDirectory {
 
     /** Forwarded Lab/Radiology/ECO orders placed from this stay (child visits). */
     java.util.List<StayOrderRef> orders(UUID stayId);
+
+    /**
+     * Reverse lookup: the stay a forwarded Lab/Radiology/ECO child visit was ordered from.
+     * Empty when the visit is not a LAB/RAD/ECO child anchored on one of this department's stays.
+     */
+    Optional<StayRef> stayForOrderVisit(UUID childVisitId);
 }

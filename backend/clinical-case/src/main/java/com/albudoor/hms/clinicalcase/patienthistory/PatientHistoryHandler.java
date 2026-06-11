@@ -9,6 +9,7 @@ import com.albudoor.hms.clinicalcase.history.HistoryEntryType;
 import com.albudoor.hms.clinicalcase.history.HistoryRefs;
 import com.albudoor.hms.clinicalcase.infrastructure.DoctorExamRepository;
 import com.albudoor.hms.visitmanagement.domain.Visit;
+import com.albudoor.hms.visitmanagement.domain.VisitType;
 import com.albudoor.hms.visitmanagement.infrastructure.VisitRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,16 +71,26 @@ public class PatientHistoryHandler {
     private List<HistoryEntry> buildTimeline(UUID patientId, List<Visit> patientVisits, List<DoctorExam> patientExams) {
         List<HistoryEntry> timeline = new ArrayList<>();
         for (HistoryContributor c : contributors) timeline.addAll(c.contribute(patientId));
-        // clinical-case's own contributions: visits + finalized exams
+        // clinical-case's own contributions: visits + finalized exams.
+        // Skip forwarded children (parentVisitId set — represented by order/DOCUMENT entries)
+        // and bed-stay anchor visits (represented by ADMISSION entries).
         for (Visit v : patientVisits) {
+            if (v.getParentVisitId() != null
+                    || v.getVisitType() == VisitType.PREMATURE
+                    || v.getVisitType() == VisitType.EMERGENCY) {
+                continue;
+            }
             timeline.add(new HistoryEntry(v.getStartedAt(), HistoryEntryType.VISIT,
                     v.getVisitType().name(), v.getVisitType().name() + " visit " + v.getVisitDisplayId(),
-                    v.getResultsSummary(), HistoryRefs.visit(v.getId())));
+                    v.getResultsSummary(), "visit",
+                    Map.of("visitType", v.getVisitType().name(), "displayId", v.getVisitDisplayId()),
+                    HistoryRefs.visit(v.getId())));
         }
         for (DoctorExam e : patientExams) {
             if (e.getFinalizedAt() != null) {
                 timeline.add(new HistoryEntry(e.getFinalizedAt(), HistoryEntryType.EXAM, "CLINICAL",
-                        "Doctor exam finalized", diagnosisSummary(e), HistoryRefs.visit(e.getVisitId())));
+                        "Doctor exam finalized", diagnosisSummary(e), "examFinalized", Map.of(),
+                        HistoryRefs.visit(e.getVisitId())));
             }
         }
         timeline.sort(Comparator.comparing(HistoryEntry::at).reversed());
